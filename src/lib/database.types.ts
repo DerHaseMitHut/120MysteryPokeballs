@@ -109,7 +109,11 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
-      create_room: { Args: { p_pool: { category: Category; value: string }[] }; Returns: RoomRow }
+      create_room: { Args: Record<string, never>; Returns: RoomRow }
+      set_content_pool: {
+        Args: { p_room_id: string; p_pool: { category: Category; value: string }[] }
+        Returns: void
+      }
       preview_room: { Args: { p_code: string }; Returns: PreviewRoomResult }
       join_room: {
         Args: { p_code: string; p_seat: Seat; p_display_name: string }

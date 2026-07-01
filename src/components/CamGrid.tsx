@@ -15,13 +15,13 @@ function VideoTile({ tile }: { tile: CamTile }) {
   }, [tile.stream])
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-neutral-900 flex items-center justify-center">
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-950 flex items-center justify-center shadow-xl shadow-black/40">
       {tile.stream ? (
         <video ref={ref} autoPlay playsInline muted={tile.isLocal} className="h-full w-full object-cover" />
       ) : (
         <span className="text-neutral-600 text-sm">Keine Kamera</span>
       )}
-      <span className="absolute bottom-1 left-1.5 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white">
+      <span className="absolute bottom-2 left-2 rounded-md bg-black/70 backdrop-blur-sm px-2 py-0.5 text-xs font-medium text-white">
         {tile.label}
       </span>
     </div>
@@ -30,7 +30,7 @@ function VideoTile({ tile }: { tile: CamTile }) {
 
 export function CamGrid({ tiles }: { tiles: CamTile[] }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-3">
       {tiles.map((tile) => (
         <VideoTile key={tile.key} tile={tile} />
       ))}

@@ -8,8 +8,10 @@ async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 }
 
 export const rpc = {
-  createRoom: (pool: { category: Category; value: string }[]) =>
-    call<RoomRow>('create_room', { p_pool: pool }),
+  createRoom: () => call<RoomRow>('create_room', {}),
+
+  setContentPool: (roomId: string, pool: { category: Category; value: string }[]) =>
+    call<void>('set_content_pool', { p_room_id: roomId, p_pool: pool }),
 
   previewRoom: (code: string) => call<PreviewRoomResult>('preview_room', { p_code: code }),
 

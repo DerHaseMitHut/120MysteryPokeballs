@@ -28,7 +28,7 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
   }, [highlighted])
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–120)</h3>
         <input
@@ -38,7 +38,7 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
           placeholder="Nr. suchen"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-24 rounded bg-neutral-800 border border-white/10 px-2 py-1 text-sm text-white placeholder:text-neutral-500"
+          className="w-24 rounded-md bg-neutral-950/60 border border-white/10 focus:border-red-500/50 focus:outline-none px-2 py-1 text-sm text-white placeholder:text-neutral-500 transition-colors"
         />
       </div>
       <div className="grid grid-cols-5 gap-2.5">
@@ -48,21 +48,21 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
           </div>
         ))}
       </div>
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-sm pt-1">
         <button
           disabled={page === 0}
           onClick={() => setPage((p) => Math.max(0, p - 1))}
-          className="rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1 text-neutral-200"
+          className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
         >
           ← Zurück
         </button>
-        <span className="text-neutral-500">
+        <span className="text-neutral-500 text-xs">
           Seite {page + 1} / {pageCount} · Bälle {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, TOTAL_BALLS)}
         </span>
         <button
           disabled={page === pageCount - 1}
           onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-          className="rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1 text-neutral-200"
+          className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
         >
           Weiter →
         </button>

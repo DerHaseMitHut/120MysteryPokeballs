@@ -12,7 +12,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
           readOnly
           value={value}
           onFocus={(e) => e.currentTarget.select()}
-          className="flex-1 rounded bg-neutral-900 border border-white/10 px-2 py-1.5 text-sm text-neutral-200 font-mono"
+          className="flex-1 rounded-md bg-neutral-950/60 border border-white/10 px-2.5 py-1.5 text-sm text-neutral-200 font-mono"
         />
         <button
           onClick={async () => {
@@ -20,7 +20,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
             setCopied(true)
             setTimeout(() => setCopied(false), 1500)
           }}
-          className="rounded bg-neutral-700 hover:bg-neutral-600 px-3 py-1.5 text-sm text-white shrink-0"
+          className="rounded-md bg-neutral-700 hover:bg-neutral-600 px-3 py-1.5 text-sm text-white shrink-0 transition"
         >
           {copied ? 'Kopiert!' : 'Kopieren'}
         </button>
@@ -37,7 +37,7 @@ export function InviteLinksPanel({
   participants: RoomParticipantRow[]
 }) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-neutral-900/40 p-4">
+    <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/30 backdrop-blur-sm p-5">
       <div>
         <span className="text-xs uppercase tracking-wide text-neutral-500">Raumcode</span>
         <p className="text-2xl font-mono font-bold text-white tracking-widest">{room.code}</p>

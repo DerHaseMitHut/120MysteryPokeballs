@@ -10,7 +10,11 @@ import { TurnBanner } from './TurnBanner'
 import { LockButton } from './LockButton'
 import { RevealBanner } from './RevealBanner'
 import { GameOverSummary } from './GameOverSummary'
+import { HostSetupPanel } from './HostSetupPanel'
+import { WaitingPanel } from './WaitingPanel'
+import { CopyButton } from './CopyButton'
 import { rpc } from '../lib/rpc'
+import { joinUrl, obsUrl } from '../lib/urls'
 import type { Category, Seat } from '../lib/database.types'
 
 export type ViewerRole = 'host' | 'obs' | Seat
@@ -102,6 +106,21 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
 
   return (
     <div className="flex flex-col gap-4 w-full max-w-[2100px] mx-auto p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-extrabold text-white tracking-tight">120 Pokébälle</h1>
+          <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2.5 py-1 text-neutral-300">
+            Code: {room.code}
+          </span>
+        </div>
+        {role === 'host' && (
+          <div className="flex items-center gap-2">
+            <CopyButton value={joinUrl(room.code)} label="Einladungslink kopieren" />
+            <CopyButton value={obsUrl(room.id, room.obs_token)} label="OBS-Link kopieren" />
+          </div>
+        )}
+      </div>
+
       <CamGrid tiles={tiles} />
 
       {showControls && role !== 'obs' && (
@@ -116,42 +135,60 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         </div>
       )}
 
-      <TurnBanner room={room} participants={participants} />
-      {room.status === 'finished' && <GameOverSummary />}
-      {pendingBall && <RevealBanner ball={pendingBall} isMine={selectableCategory != null} openerName={openerName || ''} />}
-      {actionError && <p className="text-center text-sm text-red-400">{actionError}</p>}
+      {room.status === 'setup' ? (
+        role === 'host' ? (
+          <HostSetupPanel room={room} participants={participants} />
+        ) : (
+          <WaitingPanel
+            text={
+              role === 'obs'
+                ? 'Der Host bereitet die Runde vor…'
+                : 'Der Host bereitet den Inhalts-Pool vor. Gleich geht’s los!'
+            }
+          />
+        )
+      ) : (
+        <>
+          <TurnBanner room={room} participants={participants} />
+          {room.status === 'finished' && <GameOverSummary />}
+          {pendingBall && (
+            <RevealBanner ball={pendingBall} isMine={selectableCategory != null} openerName={openerName || ''} />
+          )}
+          {actionError && <p className="text-center text-sm text-red-400">{actionError}</p>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
-        <TeamPanel
-          seat={1}
-          displayName={seat1?.display_name ?? 'Teilnehmer 1'}
-          locked={seat1?.locked ?? false}
-          isYourTurn={room.status === 'drafting' && room.current_turn_seat === 1}
-          slots={slots.filter((s) => s.seat === 1)}
-          selectableCategory={mySeat === 1 ? selectableCategory : null}
-          onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
-        />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+            <TeamPanel
+              seat={1}
+              displayName={seat1?.display_name ?? 'Teilnehmer 1'}
+              locked={seat1?.locked ?? false}
+              isYourTurn={room.status === 'drafting' && room.current_turn_seat === 1}
+              slots={slots.filter((s) => s.seat === 1)}
+              selectableCategory={mySeat === 1 ? selectableCategory : null}
+              onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
+            />
 
-        <div className="w-full lg:w-[440px] shrink-0">
-          <BallsGrid balls={balls} canDraw={!!canDraw} onDraw={handleDraw} />
-        </div>
+            <div className="w-full lg:w-[440px] shrink-0">
+              <BallsGrid balls={balls} canDraw={!!canDraw} onDraw={handleDraw} />
+            </div>
 
-        <TeamPanel
-          seat={2}
-          displayName={seat2?.display_name ?? 'Teilnehmer 2'}
-          locked={seat2?.locked ?? false}
-          isYourTurn={room.status === 'drafting' && room.current_turn_seat === 2}
-          slots={slots.filter((s) => s.seat === 2)}
-          selectableCategory={mySeat === 2 ? selectableCategory : null}
-          onSelectSlot={mySeat === 2 ? handleSelectSlot : undefined}
-          align="right"
-        />
-      </div>
+            <TeamPanel
+              seat={2}
+              displayName={seat2?.display_name ?? 'Teilnehmer 2'}
+              locked={seat2?.locked ?? false}
+              isYourTurn={room.status === 'drafting' && room.current_turn_seat === 2}
+              slots={slots.filter((s) => s.seat === 2)}
+              selectableCategory={mySeat === 2 ? selectableCategory : null}
+              onSelectSlot={mySeat === 2 ? handleSelectSlot : undefined}
+              align="right"
+            />
+          </div>
 
-      {canLock && (
-        <div className="flex justify-center">
-          <LockButton onLock={handleLock} disabled={!canLock} />
-        </div>
+          {canLock && (
+            <div className="flex justify-center">
+              <LockButton onLock={handleLock} disabled={!canLock} />
+            </div>
+          )}
+        </>
       )}
     </div>
   )

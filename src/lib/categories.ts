@@ -16,6 +16,16 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   attacke: 'bg-rose-600',
 }
 
+// Dezenter, aber deutlich sichtbarer Hintergrund/Rahmen fuer bereits befuellte Slots, damit auf
+// einen Blick erkennbar ist, welche Felder schon belegt sind — je Kategorie eingefaerbt.
+export const CATEGORY_FILLED_STYLE: Record<Category, string> = {
+  pokemon: 'bg-emerald-500/15 border-emerald-500/50',
+  item: 'bg-amber-500/15 border-amber-500/50',
+  wesen: 'bg-sky-500/15 border-sky-500/50',
+  faehigkeit: 'bg-violet-500/15 border-violet-500/50',
+  attacke: 'bg-rose-500/15 border-rose-500/50',
+}
+
 export const POOL_REQUIREMENTS: Record<Category, number> = {
   pokemon: 20,
   item: 15,

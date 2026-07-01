@@ -14,7 +14,7 @@ export function RevealBanner({ ball, isMine, openerName }: Props) {
   return (
     <div className="flex items-center justify-center">
       <div
-        className={`flex items-center gap-3 rounded-xl border border-white/10 bg-neutral-900 px-4 py-2 shadow-lg animate-[pulse_1.4s_ease-in-out_1]`}
+        className={`flex items-center gap-3 rounded-2xl border border-white/10 bg-neutral-900/80 backdrop-blur-sm px-4 py-2.5 shadow-xl shadow-black/40 animate-[pulse_1.4s_ease-in-out_1]`}
       >
         <span className="text-xs text-neutral-400">Ball #{ball.number} geöffnet von {openerName}</span>
         <span className={`px-2 py-0.5 rounded text-xs font-semibold text-white ${colorClass}`}>

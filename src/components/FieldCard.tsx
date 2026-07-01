@@ -25,7 +25,7 @@ export function FieldCard({ fieldIndex, slots, selectableCategory, onSelectSlot 
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-neutral-900/40 p-3 flex flex-col gap-2.5">
+    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-3 flex flex-col gap-2.5 shadow-inner shadow-black/20">
       <span className="text-xs uppercase tracking-wide text-neutral-500">Feld {fieldIndex}</span>
 
       <PokemonSlot {...slotProps('pokemon', 1)} />

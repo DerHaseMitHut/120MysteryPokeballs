@@ -200,8 +200,28 @@ begin
 end;
 $$;
 
-create or replace function public.create_room(p_pool jsonb)
+-- Erstellt einen leeren Raum sofort (ohne Pool) — der Host landet direkt auf dem Hauptbildschirm
+-- (Cams/Baelle/Teams-Layout) und traegt den Pool von dort aus ueber set_content_pool() ein,
+-- statt vorher eine separate Eingabemaske ausfuellen zu muessen.
+create or replace function public.create_room()
 returns public.rooms
+language plpgsql security definer set search_path = public as $$
+declare
+  v_room rooms;
+begin
+  insert into rooms (code, host_user_id) values (public.generate_room_code(), auth.uid())
+    returning * into v_room;
+
+  insert into room_participants (room_id, seat) values (v_room.id, 1), (v_room.id, 2);
+
+  return v_room;
+end;
+$$;
+
+-- Setzt/ersetzt den 120er-Pool eines Raums, solange dieser noch im Setup ist. Kann beliebig oft
+-- aufgerufen werden (z.B. waehrend der Host noch tippt und die Teilnehmer schon warten).
+create or replace function public.set_content_pool(p_room_id uuid, p_pool jsonb)
+returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_room rooms;
@@ -212,6 +232,14 @@ declare
   v_count_attacke int;
   v_total int;
 begin
+  select * into v_room from rooms where id = p_room_id;
+  if not found or v_room.host_user_id <> auth.uid() then
+    raise exception 'Nur der Host kann den Pool bearbeiten';
+  end if;
+  if v_room.status <> 'setup' then
+    raise exception 'Der Pool kann nach Spielstart nicht mehr geaendert werden';
+  end if;
+
   select count(*) filter (where value->>'category' = 'pokemon'),
          count(*) filter (where value->>'category' = 'item'),
          count(*) filter (where value->>'category' = 'wesen'),
@@ -226,16 +254,10 @@ begin
     raise exception 'Pool muss genau 20 Pokemon, 15 Item, 15 Wesen, 15 Faehigkeit, 55 Attacke enthalten (erhalten: % gesamt)', v_total;
   end if;
 
-  insert into rooms (code, host_user_id) values (public.generate_room_code(), auth.uid())
-    returning * into v_room;
-
-  insert into room_participants (room_id, seat) values (v_room.id, 1), (v_room.id, 2);
-
+  delete from content_pool where room_id = p_room_id;
   insert into content_pool (room_id, category, value)
-    select v_room.id, entry->>'category', entry->>'value'
+    select p_room_id, entry->>'category', entry->>'value'
     from jsonb_array_elements(p_pool) as entry;
-
-  return v_room;
 end;
 $$;
 
@@ -527,12 +549,13 @@ end;
 $$;
 
 revoke all on function
-  public.create_room, public.preview_room, public.join_room, public.start_game,
+  public.create_room, public.set_content_pool, public.preview_room, public.join_room, public.start_game,
   public.draw_ball, public.place_ball, public.lock_team, public.claim_obs_view,
   public.regenerate_obs_token, public.generate_room_code
   from public;
 
-grant execute on function public.create_room(jsonb) to authenticated;
+grant execute on function public.create_room() to authenticated;
+grant execute on function public.set_content_pool(uuid, jsonb) to authenticated;
 grant execute on function public.preview_room(text) to authenticated;
 grant execute on function public.join_room(text, int, text) to authenticated;
 grant execute on function public.start_game(uuid, int) to authenticated;

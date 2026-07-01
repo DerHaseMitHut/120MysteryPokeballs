@@ -1,4 +1,4 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS } from '../lib/categories'
+import { CATEGORY_COLORS, CATEGORY_FILLED_STYLE, CATEGORY_LABELS } from '../lib/categories'
 import type { Category } from '../lib/database.types'
 
 interface Props {
@@ -17,20 +17,21 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
   ) : value != null ? (
     <span className="text-white font-medium truncate">{value}</span>
   ) : (
-    <span className="text-neutral-500 italic">zensiert</span>
+    <span className="text-neutral-400 italic">zensiert</span>
   )
+
+  const stateClass = selectable
+    ? 'border-yellow-400 bg-neutral-800 hover:bg-neutral-700 cursor-pointer'
+    : filled
+      ? `${CATEGORY_FILLED_STYLE[slotType]} cursor-default`
+      : 'border-white/10 bg-neutral-900/60 cursor-default'
 
   return (
     <button
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-2.5 py-2 min-h-[3.25rem] text-xs flex flex-col items-start gap-1 text-left transition
-        ${
-          selectable
-            ? 'border-yellow-400 bg-neutral-800 hover:bg-neutral-700 cursor-pointer'
-            : 'border-white/10 bg-neutral-900/60 cursor-default'
-        }`}
+      className={`w-full rounded-md border px-2.5 py-2 min-h-[3.25rem] text-xs flex flex-col items-start gap-1 text-left transition ${stateClass}`}
     >
       <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold`}>
         {CATEGORY_LABELS[slotType]}

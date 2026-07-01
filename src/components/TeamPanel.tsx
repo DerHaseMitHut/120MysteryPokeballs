@@ -25,8 +25,8 @@ export function TeamPanel({
 }: Props) {
   return (
     <div
-      className={`flex flex-col gap-3 rounded-xl border p-4 w-full
-        ${isYourTurn ? 'border-yellow-400/70 bg-yellow-400/5' : 'border-white/10 bg-neutral-950/40'}`}
+      className={`flex flex-col gap-3 rounded-2xl border p-4 w-full shadow-xl shadow-black/30 backdrop-blur-sm transition-colors
+        ${isYourTurn ? 'border-yellow-400/70 bg-yellow-400/5 shadow-yellow-500/10' : 'border-white/10 bg-neutral-900/50'}`}
     >
       <div className={`flex items-center gap-2 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}>
         <span className="font-semibold text-lg text-white">{displayName || `Teilnehmer ${seat}`}</span>
