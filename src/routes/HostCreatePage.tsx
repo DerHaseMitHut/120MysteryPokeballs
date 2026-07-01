@@ -27,7 +27,7 @@ export function HostCreatePage() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-lg w-full flex flex-col items-center gap-6 text-center rounded-2xl border border-white/10 bg-neutral-900/60 shadow-2xl shadow-black/40 backdrop-blur-sm p-10">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">120 Pokébälle</h1>
+          <h1 className="brand-title text-3xl text-white tracking-tight">120 Mystery Pokéballs!</h1>
           <p className="text-neutral-400 text-sm">
             Zieh mit zwei Freunden abwechselnd Pokébälle und baut daraus eure Teams — live per Video, alles im
             Browser.

@@ -31,3 +31,11 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Nur fuer den Marken-Schriftzug "120 Mystery Pokéballs!" — der Rest der App bleibt bei der
+   System-Schrift, damit UI-Text weiterhin schnell und neutral lesbar bleibt. */
+.brand-title {
+  font-family: "Baloo 2", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}

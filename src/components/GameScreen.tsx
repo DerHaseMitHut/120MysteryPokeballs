@@ -109,10 +109,12 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     <div className="flex flex-col gap-2.5 w-full max-w-[2100px] mx-auto p-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-base font-extrabold text-white tracking-tight">120 Pokébälle</h1>
-          <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2.5 py-0.5 text-neutral-300">
-            Code: {room.code}
-          </span>
+          <h1 className="brand-title text-lg text-white tracking-tight">120 Mystery Pokéballs!</h1>
+          {role !== 'obs' && (
+            <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2.5 py-0.5 text-neutral-300">
+              Code: {room.code}
+            </span>
+          )}
           {showControls && role !== 'obs' && (
             <button
               onClick={() => setCamEnabled((v) => !v)}
@@ -164,6 +166,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
 
             <div className="w-full lg:w-[500px] shrink-0">
               <BallsGrid
+                roomId={roomId}
                 balls={balls}
                 canDraw={!!canDraw}
                 onDraw={handleDraw}
@@ -171,6 +174,8 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 isMine={isMyBall}
                 openerName={openerName || ''}
                 onRevealed={() => pendingBall && setRevealedBallId(pendingBall.id)}
+                isController={isMyTurn}
+                isFollower={role === 'host' || role === 'obs'}
               />
             </div>
 

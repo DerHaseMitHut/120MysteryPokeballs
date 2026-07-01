@@ -37,12 +37,15 @@ export function ObsViewPage() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#0f1115' }}>
+      {/* "zoom" statt "transform: scale(...)": transform skaliert eine bereits gerenderte Bitmap
+          (unscharfe Kanten/Text beim Verkleinern), zoom layoutet/rendert nativ in Zielgroesse neu
+          und bleibt dadurch scharf. In Chromium/CEF unterstuetzt — deckt sowohl OBS als auch
+          normale Chromium-Browser ab. */}
       <div
         style={{
           width: WIDTH,
           height: HEIGHT,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
+          zoom: scale,
           overflow: 'hidden',
         }}
       >

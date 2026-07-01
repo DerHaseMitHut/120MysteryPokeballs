@@ -25,12 +25,8 @@ export function BallCell({ number, ball, canDraw, onDraw }: Props) {
         disabled={!canDraw}
         onClick={() => onDraw(number)}
         title={canDraw ? `Ball #${number} öffnen` : `Ball #${number}`}
-        className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 overflow-hidden p-1 transition
-          ${
-            canDraw
-              ? 'border-red-500/60 bg-neutral-900 hover:bg-neutral-800 hover:scale-[1.03] cursor-pointer shadow'
-              : 'border-white/10 bg-neutral-900/60 opacity-60 cursor-not-allowed'
-          }`}
+        className={`aspect-square rounded-xl border border-red-500/60 bg-neutral-900 flex flex-col items-center justify-center gap-0.5 overflow-hidden p-1 shadow transition
+          ${canDraw ? 'hover:bg-neutral-800 hover:scale-[1.03] cursor-pointer' : 'cursor-not-allowed'}`}
       >
         <div className="flex-1 min-h-0 w-full flex items-center justify-center">
           {!imageFailed ? (

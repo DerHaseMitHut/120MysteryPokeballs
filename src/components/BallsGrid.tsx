@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BallCell } from './BallCell'
 import { BallRevealOverlay } from './BallRevealOverlay'
+import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallWithValue } from '../hooks/useBalls'
 import { TOTAL_BALLS } from '../lib/categories'
 
 const PER_PAGE = 20
 
 interface Props {
+  roomId: string
   balls: Map<number, BallWithValue>
   canDraw: boolean
   onDraw: (number: number) => void
@@ -14,11 +16,33 @@ interface Props {
   isMine: boolean
   openerName: string
   onRevealed?: () => void
+  // isController: aktiver ziehender Teilnehmer — dessen Seiten-Navigation wird gebroadcastet.
+  // isFollower: uebernimmt eingehende Seiten automatisch (Host/OBS), eigene Blaetter-Buttons entfallen.
+  isController: boolean
+  isFollower: boolean
 }
 
-export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerName, onRevealed }: Props) {
+export function BallsGrid({
+  roomId,
+  balls,
+  canDraw,
+  onDraw,
+  revealBall,
+  isMine,
+  openerName,
+  onRevealed,
+  isController,
+  isFollower,
+}: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const channelRef = useRef<ReturnType<typeof freshChannel> | null>(null)
+  const isFollowerRef = useRef(isFollower)
+  isFollowerRef.current = isFollower
+  const isControllerRef = useRef(isController)
+  isControllerRef.current = isController
+  const pageRef = useRef(page)
+  pageRef.current = page
 
   const pageCount = Math.ceil(TOTAL_BALLS / PER_PAGE)
   const numbers = useMemo(() => Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1), [])
@@ -31,6 +55,45 @@ export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerNa
       setPage(Math.floor((highlighted - 1) / PER_PAGE))
     }
   }, [highlighted])
+
+  // Presence (nicht Broadcast!) fuer die Seiten-Synchronisation: der aktive Teilnehmer "trackt"
+  // seine aktuelle Seite, Host/OBS lesen sie ueber den 'sync'-Event. Presence liefert bei jedem
+  // Sync sofort den VOLLEN aktuellen Stand — anders als Broadcast-Events, die ein spaeter
+  // beitretender Betrachter (z.B. OBS, erst nach dem Umblaettern geoeffnet) sonst verpassen wuerde.
+  useEffect(() => {
+    const channel = freshChannel(`room:${roomId}:ui`)
+    channel.on('presence', { event: 'sync' }, () => {
+      if (!isFollowerRef.current) return
+      const state = channel.presenceState<{ page: number }>()
+      for (const key in state) {
+        const entry = state[key]?.[0]
+        if (entry && typeof entry.page === 'number') {
+          setPage(entry.page)
+          break
+        }
+      }
+    })
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        channelRef.current = channel
+        if (isControllerRef.current) channel.track({ page: pageRef.current })
+      }
+    })
+    return () => {
+      supabase.removeChannel(channel)
+      channelRef.current = null
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    const channel = channelRef.current
+    if (!channel) return
+    if (isController) {
+      channel.track({ page })
+    } else {
+      channel.untrack()
+    }
+  }, [isController, page])
 
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3.5">
@@ -64,23 +127,29 @@ export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerNa
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <button
-          disabled={page === 0}
-          onClick={() => setPage((p) => Math.max(0, p - 1))}
-          className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
-        >
-          ← Zurück
-        </button>
+        {isFollower ? (
+          <span className="text-neutral-600 text-xs italic">folgt automatisch</span>
+        ) : (
+          <button
+            disabled={page === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
+          >
+            ← Zurück
+          </button>
+        )}
         <span className="text-neutral-500 text-xs">
           Seite {page + 1} / {pageCount} · Bälle {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, TOTAL_BALLS)}
         </span>
-        <button
-          disabled={page === pageCount - 1}
-          onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-          className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
-        >
-          Weiter →
-        </button>
+        {!isFollower && (
+          <button
+            disabled={page === pageCount - 1}
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            className="rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 text-neutral-200 transition"
+          >
+            Weiter →
+          </button>
+        )}
       </div>
     </div>
   )
