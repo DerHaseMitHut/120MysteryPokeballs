@@ -26,9 +26,9 @@ export function PokemonSlot({ value, filled, selectable, onSelect }: Props) {
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`h-full w-full rounded-lg border px-1.5 py-1.5 flex flex-col items-center gap-1 text-center transition ${stateClass}`}
+      className={`h-full w-full rounded-lg border px-2 py-2 flex flex-col items-center gap-1.5 text-center transition ${stateClass}`}
     >
-      <span className={`px-1.5 py-0.5 rounded ${CATEGORY_COLORS.pokemon} text-white text-[9px] font-semibold shrink-0`}>
+      <span className={`px-1.5 py-0.5 rounded ${CATEGORY_COLORS.pokemon} text-white text-[10px] font-semibold shrink-0`}>
         {CATEGORY_LABELS.pokemon}
       </span>
       <div className="flex-1 w-full min-h-0 flex items-center justify-center">
@@ -40,12 +40,12 @@ export function PokemonSlot({ value, filled, selectable, onSelect }: Props) {
             className="max-h-full max-w-full object-contain [image-rendering:pixelated] drop-shadow"
           />
         ) : filled ? (
-          <span className="text-white font-semibold text-[10px] leading-tight px-1">{value}</span>
+          <span className="text-white font-semibold text-xs leading-tight px-1">{value}</span>
         ) : (
-          <span className="text-neutral-600 italic text-xs">leer</span>
+          <span className="text-neutral-600 italic text-sm">leer</span>
         )}
       </div>
-      {filled && <span className="text-xs font-bold text-white truncate w-full shrink-0">{value}</span>}
+      {filled && <span className="text-sm font-bold text-white truncate w-full shrink-0">{value}</span>}
     </button>
   )
 }

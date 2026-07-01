@@ -15,7 +15,7 @@ function VideoTile({ tile }: { tile: CamTile }) {
   }, [tile.stream])
 
   return (
-    <div className="relative h-32 md:h-40 w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-950 flex items-center justify-center shadow-lg shadow-black/40">
+    <div className="relative h-44 md:h-52 aspect-video overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-950 flex items-center justify-center shadow-lg shadow-black/40">
       {tile.stream ? (
         <video ref={ref} autoPlay playsInline muted={tile.isLocal} className="h-full w-full object-cover" />
       ) : (
@@ -28,9 +28,11 @@ function VideoTile({ tile }: { tile: CamTile }) {
   )
 }
 
+// Flex + intrinsische Groesse (h + aspect-video) statt Grid-Stretch: so bleibt das
+// Kamera-Seitenverhaeltnis immer sauber 16:9, egal wie breit der verfuegbare Platz ist.
 export function CamGrid({ tiles }: { tiles: CamTile[] }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="flex justify-center gap-3">
       {tiles.map((tile) => (
         <VideoTile key={tile.key} tile={tile} />
       ))}

@@ -164,7 +164,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
             />
 
-            <div className="w-full lg:w-[440px] shrink-0">
+            <div className="w-full lg:w-[500px] shrink-0">
               <BallsGrid balls={balls} canDraw={!!canDraw} onDraw={handleDraw} />
             </div>
 

@@ -31,7 +31,7 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-2.5 py-1.5 min-h-[2.75rem] text-xs flex flex-col items-start justify-center gap-1 text-left transition ${stateClass}`}
+      className={`w-full rounded-md border px-3 py-2 min-h-[3.25rem] text-sm flex flex-col items-start justify-center gap-1 text-left transition ${stateClass}`}
     >
       <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold leading-tight`}>
         {CATEGORY_LABELS[slotType]}

@@ -40,7 +40,7 @@ export function BallCell({ number, ball, canDraw, onDraw }: Props) {
               : 'border-white/10 bg-neutral-900/60 opacity-60 cursor-not-allowed'
           }`}
       >
-        <PokeballGraphic phase="closed" size={56} />
+        <PokeballGraphic phase="closed" size={64} />
         <span className="text-xs font-semibold text-neutral-300">#{number}</span>
       </button>
     )
@@ -53,7 +53,7 @@ export function BallCell({ number, ball, canDraw, onDraw }: Props) {
       className="aspect-square rounded-xl border border-white/5 bg-neutral-900/30 flex flex-col items-center justify-center gap-1"
       title={`Ball #${number} — bereits geöffnet`}
     >
-      <PokeballGraphic phase={justOpened ? 'opening' : 'empty'} size={justOpened ? 56 : 34} />
+      <PokeballGraphic phase={justOpened ? 'opening' : 'empty'} size={justOpened ? 64 : 40} />
       <span className="text-[10px] text-neutral-600">#{number}</span>
     </div>
   )

@@ -25,11 +25,11 @@ export function TeamPanel({
 }: Props) {
   return (
     <div
-      className={`flex flex-col gap-2.5 rounded-2xl border p-3 w-full shadow-xl shadow-black/30 backdrop-blur-sm transition-colors
+      className={`flex flex-col gap-3 rounded-2xl border p-3.5 w-full shadow-xl shadow-black/30 backdrop-blur-sm transition-colors
         ${isYourTurn ? 'border-yellow-400/70 bg-yellow-400/5 shadow-yellow-500/10' : 'border-white/10 bg-neutral-900/50'}`}
     >
       <div className={`flex items-center gap-2 px-0.5 ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}>
-        <span className="font-semibold text-white">{displayName || `Teilnehmer ${seat}`}</span>
+        <span className="font-semibold text-lg text-white">{displayName || `Teilnehmer ${seat}`}</span>
         {locked && (
           <span className="text-[10px] uppercase tracking-wide bg-neutral-700 text-neutral-300 px-1.5 py-0.5 rounded">
             gelockt
@@ -41,7 +41,7 @@ export function TeamPanel({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         {[1, 2, 3, 4].map((fieldIndex) => (
           <FieldCard
             key={fieldIndex}

@@ -28,7 +28,7 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
   }, [highlighted])
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3">
+    <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3.5">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–120)</h3>
         <input
@@ -41,7 +41,7 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
           className="w-24 rounded-md bg-neutral-950/60 border border-white/10 focus:border-red-500/50 focus:outline-none px-2 py-1 text-sm text-white placeholder:text-neutral-500 transition-colors"
         />
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-5 gap-2.5">
         {pageNumbers.map((n) => (
           <div key={n} className={highlighted === n ? 'ring-2 ring-yellow-400 rounded-xl' : undefined}>
             <BallCell number={n} ball={balls.get(n)} canDraw={canDraw} onDraw={onDraw} />
