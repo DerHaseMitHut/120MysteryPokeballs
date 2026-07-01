@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { TeamSlotRow } from '../lib/database.types'
 
 export interface TeamSlotWithValue extends TeamSlotRow {
@@ -35,8 +35,16 @@ export function useTeamSlots(roomId: string | null) {
 
     load()
 
-    const channel = supabase
-      .channel(`team-slots-${roomId}`)
+    // Wie in useBalls: ball_contents-Zeilen existieren schon seit start_game, ein Platzieren
+    // aendert nur die RLS-Sichtbarkeit, nie die Zeile selbst — deshalb hier aktiv nachfragen statt
+    // auf ein (nie feuerndes) INSERT-Event zu warten.
+    async function refetchValue(slotId: string, ballId: string) {
+      const { data } = await supabase.from('ball_contents').select('value').eq('ball_id', ballId).maybeSingle()
+      if (cancelled) return
+      setSlots((prev) => prev.map((s) => (s.id === slotId ? { ...s, value: data?.value ?? null } : s)))
+    }
+
+    const channel = freshChannel(`team-slots-${roomId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'team_slots', filter: `room_id=eq.${roomId}` },
@@ -49,14 +57,7 @@ export function useTeamSlots(roomId: string | null) {
             const next = prev.filter((s) => s.id !== row.id)
             return [...next, { ...row, value }]
           })
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ball_contents', filter: `room_id=eq.${roomId}` },
-        (payload) => {
-          const row = payload.new as { ball_id: string; value: string }
-          setSlots((prev) => prev.map((s) => (s.filled_ball_id === row.ball_id ? { ...s, value: row.value } : s)))
+          if (row.filled_ball_id) refetchValue(row.id, row.filled_ball_id)
         },
       )
       .subscribe()

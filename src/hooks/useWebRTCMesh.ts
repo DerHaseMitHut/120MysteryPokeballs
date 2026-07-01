@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, freshChannel } from '../lib/supabaseClient'
 
 type RtcSignal =
   | { kind: 'join'; from: string }
@@ -72,7 +72,7 @@ export function useWebRTCMesh(
     if (!roomId || !myPeerId) return
     if (!receiveOnly && !localStream) return
 
-    const channel = supabase.channel(`room:${roomId}:rtc`, { config: { broadcast: { self: false } } })
+    const channel = freshChannel(`room:${roomId}:rtc`, { config: { broadcast: { self: false } } })
     channelRef.current = channel
 
     function getOrCreatePeer(otherId: string): PeerEntry {

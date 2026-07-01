@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallRow } from '../lib/database.types'
 
 export interface BallWithValue extends BallRow {
@@ -36,8 +36,23 @@ export function useBalls(roomId: string | null) {
 
     load()
 
-    const channel = supabase
-      .channel(`balls-${roomId}`)
+    // ball_contents-Zeilen fuer ALLE 120 Baelle existieren bereits seit start_game (nur durch RLS
+    // unsichtbar) — beim Oeffnen aendert sich also nichts an der Zeile selbst, nur die Sichtbarkeit
+    // fuer den jeweiligen Betrachter. Dafuer feuert Realtime kein INSERT/UPDATE-Event. Deshalb bei
+    // jeder balls-Aenderung aktiv (neu) nachfragen, ob der Wert jetzt (fuer uns) lesbar ist.
+    async function refetchValue(ballId: string, number: number) {
+      const { data } = await supabase.from('ball_contents').select('value').eq('ball_id', ballId).maybeSingle()
+      if (cancelled) return
+      setBalls((prev) => {
+        const existing = prev.get(number)
+        if (!existing || existing.id !== ballId) return prev
+        const next = new Map(prev)
+        next.set(number, { ...existing, value: data?.value ?? null })
+        return next
+      })
+    }
+
+    const channel = freshChannel(`balls-${roomId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'balls', filter: `room_id=eq.${roomId}` },
@@ -50,23 +65,7 @@ export function useBalls(roomId: string | null) {
             next.set(row.number, { ...row, value: existing?.value ?? null })
             return next
           })
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ball_contents', filter: `room_id=eq.${roomId}` },
-        (payload) => {
-          const row = payload.new as { ball_id: string; value: string }
-          setBalls((prev) => {
-            const next = new Map(prev)
-            for (const [number, ball] of next) {
-              if (ball.id === row.ball_id) {
-                next.set(number, { ...ball, value: row.value })
-                break
-              }
-            }
-            return next
-          })
+          if (row.opened) refetchValue(row.id, row.number)
         },
       )
       .subscribe()

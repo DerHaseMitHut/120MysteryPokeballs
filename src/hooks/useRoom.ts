@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { RoomRow, RoomParticipantRow } from '../lib/database.types'
 
 interface RoomState {
@@ -45,8 +45,7 @@ export function useRoom(roomId: string | null): RoomState {
 
     load()
 
-    const channel = supabase
-      .channel(`room-state-${roomId}`)
+    const channel = freshChannel(`room-state-${roomId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
