@@ -13,9 +13,10 @@ interface Props {
   revealBall: BallWithValue | null
   isMine: boolean
   openerName: string
+  onRevealed?: () => void
 }
 
-export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerName }: Props) {
+export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerName, onRevealed }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
 
@@ -50,7 +51,7 @@ export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerNa
           exakt die gleiche Flaeche einnimmt, die sonst die Ball-Kacheln belegen. */}
       <div className="relative aspect-[5/4]">
         {revealBall ? (
-          <BallRevealOverlay ball={revealBall} isMine={isMine} openerName={openerName} />
+          <BallRevealOverlay ball={revealBall} isMine={isMine} openerName={openerName} onRevealed={onRevealed} />
         ) : (
           <div className="grid grid-cols-5 gap-2.5 h-full">
             {pageNumbers.map((n) => (

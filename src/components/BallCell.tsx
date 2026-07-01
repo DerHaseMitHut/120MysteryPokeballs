@@ -25,24 +25,26 @@ export function BallCell({ number, ball, canDraw, onDraw }: Props) {
         disabled={!canDraw}
         onClick={() => onDraw(number)}
         title={canDraw ? `Ball #${number} öffnen` : `Ball #${number}`}
-        className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 overflow-hidden transition
+        className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-0.5 overflow-hidden p-1 transition
           ${
             canDraw
               ? 'border-red-500/60 bg-neutral-900 hover:bg-neutral-800 hover:scale-[1.03] cursor-pointer shadow'
               : 'border-white/10 bg-neutral-900/60 opacity-60 cursor-not-allowed'
           }`}
       >
-        {!imageFailed ? (
-          <img
-            src={CLOSED_IMAGE_SRC}
-            alt=""
-            onError={() => setImageFailed(true)}
-            className="h-2/3 w-2/3 object-contain pointer-events-none"
-          />
-        ) : (
-          <PokeballGraphic phase="closed" size={64} />
-        )}
-        <span className="text-xs font-semibold text-neutral-300">#{number}</span>
+        <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+          {!imageFailed ? (
+            <img
+              src={CLOSED_IMAGE_SRC}
+              alt=""
+              onError={() => setImageFailed(true)}
+              className="max-h-full max-w-full object-contain pointer-events-none"
+            />
+          ) : (
+            <PokeballGraphic phase="closed" size={64} />
+          )}
+        </div>
+        <span className="text-xs font-semibold text-neutral-300 shrink-0">#{number}</span>
       </button>
     )
   }

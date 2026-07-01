@@ -30,6 +30,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const { balls } = useBalls(roomId)
   const { slots } = useTeamSlots(roomId)
   const [camEnabled, setCamEnabled] = useState(false)
+  const [revealedBallId, setRevealedBallId] = useState<string | null>(null)
 
   const mySeat: Seat | null = role === 1 || role === 2 ? role : null
 
@@ -63,10 +64,11 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const isMyTurn = mySeat != null && room?.status === 'drafting' && room.current_turn_seat === mySeat
   const canDraw = showControls && isMyTurn && !pendingBall && !myParticipant?.locked
   const canLock = showControls && isMyTurn && !pendingBall && !myParticipant?.locked
-  const selectableCategory: Category | null =
-    showControls && mySeat != null && pendingBall && pendingBall.opened_by_seat === mySeat
-      ? pendingBall.category
-      : null
+  const isMyBall = showControls && mySeat != null && !!pendingBall && pendingBall.opened_by_seat === mySeat
+  // Slots duerfen erst markiert/waehlbar werden, NACHDEM die Reveal-Animation durchgelaufen ist —
+  // sonst waere die Kategorie schon durch die Markierung erkennbar, bevor sie offiziell gezeigt wird.
+  const isRevealed = !!pendingBall && revealedBallId === pendingBall.id
+  const selectableCategory: Category | null = isMyBall && isRevealed ? pendingBall!.category : null
 
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -166,8 +168,9 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 canDraw={!!canDraw}
                 onDraw={handleDraw}
                 revealBall={pendingBall}
-                isMine={selectableCategory != null}
+                isMine={isMyBall}
                 openerName={openerName || ''}
+                onRevealed={() => pendingBall && setRevealedBallId(pendingBall.id)}
               />
             </div>
 
