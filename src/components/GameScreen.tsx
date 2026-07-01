@@ -105,13 +105,22 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     pendingBall && (participants.find((p) => p.seat === pendingBall.opened_by_seat)?.display_name ?? 'Teilnehmer')
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-[2100px] mx-auto p-4">
+    <div className="flex flex-col gap-2.5 w-full max-w-[2100px] mx-auto p-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-extrabold text-white tracking-tight">120 Pokébälle</h1>
-          <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2.5 py-1 text-neutral-300">
+          <h1 className="text-base font-extrabold text-white tracking-tight">120 Pokébälle</h1>
+          <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2.5 py-0.5 text-neutral-300">
             Code: {room.code}
           </span>
+          {showControls && role !== 'obs' && (
+            <button
+              onClick={() => setCamEnabled((v) => !v)}
+              className="text-xs rounded bg-neutral-800 hover:bg-neutral-700 border border-white/10 px-2.5 py-1 text-neutral-300"
+            >
+              {camEnabled ? 'Kamera deaktivieren' : 'Kamera aktivieren'}
+            </button>
+          )}
+          {camError && <span className="text-xs text-red-400">{camError}</span>}
         </div>
         {role === 'host' && (
           <div className="flex items-center gap-2">
@@ -122,18 +131,6 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
       </div>
 
       <CamGrid tiles={tiles} />
-
-      {showControls && role !== 'obs' && (
-        <div className="flex justify-center">
-          <button
-            onClick={() => setCamEnabled((v) => !v)}
-            className="text-xs rounded bg-neutral-800 hover:bg-neutral-700 border border-white/10 px-3 py-1 text-neutral-300"
-          >
-            {camEnabled ? 'Kamera & Mikrofon deaktivieren' : 'Kamera & Mikrofon aktivieren'}
-          </button>
-          {camError && <span className="text-xs text-red-400 ml-2">{camError}</span>}
-        </div>
-      )}
 
       {room.status === 'setup' ? (
         role === 'host' ? (
@@ -156,7 +153,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
           )}
           {actionError && <p className="text-center text-sm text-red-400">{actionError}</p>}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-start">
             <TeamPanel
               seat={1}
               displayName={seat1?.display_name ?? 'Teilnehmer 1'}

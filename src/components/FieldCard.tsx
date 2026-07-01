@@ -25,15 +25,18 @@ export function FieldCard({ fieldIndex, slots, selectableCategory, onSelectSlot 
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-3 flex flex-col gap-2.5 shadow-inner shadow-black/20">
-      <span className="text-xs uppercase tracking-wide text-neutral-500">Feld {fieldIndex}</span>
+    <div className="relative rounded-lg bg-neutral-950/30 p-2 flex flex-col gap-2">
+      <span className="absolute top-1 right-1.5 text-[9px] text-neutral-600 leading-none z-10">{fieldIndex}</span>
 
-      <PokemonSlot {...slotProps('pokemon', 1)} />
-
-      <div className="grid grid-cols-3 gap-2">
-        <SlotCell slotType="wesen" {...slotProps('wesen', 1)} />
-        <SlotCell slotType="faehigkeit" {...slotProps('faehigkeit', 1)} />
-        <SlotCell slotType="item" {...slotProps('item', 1)} />
+      <div className="flex gap-2 items-stretch">
+        <div className="w-24 shrink-0">
+          <PokemonSlot {...slotProps('pokemon', 1)} />
+        </div>
+        <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+          <SlotCell slotType="faehigkeit" {...slotProps('faehigkeit', 1)} />
+          <SlotCell slotType="wesen" {...slotProps('wesen', 1)} />
+          <SlotCell slotType="item" {...slotProps('item', 1)} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">

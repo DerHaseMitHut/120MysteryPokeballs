@@ -13,11 +13,11 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
   const colorClass = CATEGORY_COLORS[slotType]
 
   const content = !filled ? (
-    <span className="text-neutral-600 italic">leer</span>
+    <span className="text-neutral-600 italic leading-tight">leer</span>
   ) : value != null ? (
-    <span className="text-white font-medium truncate">{value}</span>
+    <span className="text-white font-medium truncate leading-tight w-full">{value}</span>
   ) : (
-    <span className="text-neutral-400 italic">zensiert</span>
+    <span className="text-neutral-400 italic leading-tight">zensiert</span>
   )
 
   const stateClass = selectable
@@ -31,9 +31,9 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-2.5 py-2 min-h-[3.25rem] text-xs flex flex-col items-start gap-1 text-left transition ${stateClass}`}
+      className={`w-full rounded-md border px-2.5 py-1.5 min-h-[2.75rem] text-xs flex flex-col items-start justify-center gap-1 text-left transition ${stateClass}`}
     >
-      <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold`}>
+      <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold leading-tight`}>
         {CATEGORY_LABELS[slotType]}
       </span>
       {content}
