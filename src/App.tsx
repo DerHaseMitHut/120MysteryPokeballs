@@ -8,6 +8,7 @@ import { ObsViewPage } from './routes/ObsViewPage'
 function App() {
   return (
     <BrowserRouter>
+      <div className="app-background" aria-hidden="true" />
       <Routes>
         <Route path="/" element={<HostCreatePage />} />
         <Route path="/host/:roomId" element={<HostLobbyPage />} />
