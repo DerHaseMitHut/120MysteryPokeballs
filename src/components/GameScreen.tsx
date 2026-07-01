@@ -101,7 +101,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     pendingBall && (participants.find((p) => p.seat === pendingBall.opened_by_seat)?.display_name ?? 'Teilnehmer')
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-[1800px] mx-auto p-4">
+    <div className="flex flex-col gap-4 w-full max-w-[2100px] mx-auto p-4">
       <CamGrid tiles={tiles} />
 
       {showControls && role !== 'obs' && (
@@ -132,7 +132,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
           onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
         />
 
-        <div className="w-full lg:w-[640px]">
+        <div className="w-full lg:w-[440px] shrink-0">
           <BallsGrid balls={balls} canDraw={!!canDraw} onDraw={handleDraw} />
         </div>
 

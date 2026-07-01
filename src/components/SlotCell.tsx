@@ -25,7 +25,7 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-2 py-1.5 text-xs flex flex-col items-start gap-0.5 text-left transition
+      className={`w-full rounded-md border px-2.5 py-2 min-h-[3.25rem] text-xs flex flex-col items-start gap-1 text-left transition
         ${
           selectable
             ? 'border-yellow-400 bg-neutral-800 hover:bg-neutral-700 cursor-pointer'

@@ -1,4 +1,5 @@
-import { CATEGORY_COLORS, CATEGORY_LABELS } from '../lib/categories'
+import { useEffect, useRef, useState } from 'react'
+import { PokeballGraphic } from './PokeballGraphic'
 import type { BallWithValue } from '../hooks/useBalls'
 
 interface Props {
@@ -8,8 +9,22 @@ interface Props {
   onDraw: (number: number) => void
 }
 
+const OPEN_ANIMATION_MS = 1200
+
 export function BallCell({ number, ball, canDraw, onDraw }: Props) {
   const opened = ball?.opened ?? false
+  const wasOpened = useRef(opened)
+  const [justOpened, setJustOpened] = useState(false)
+
+  useEffect(() => {
+    if (opened && !wasOpened.current) {
+      setJustOpened(true)
+      const timeout = setTimeout(() => setJustOpened(false), OPEN_ANIMATION_MS)
+      wasOpened.current = true
+      return () => clearTimeout(timeout)
+    }
+    wasOpened.current = opened
+  }, [opened])
 
   if (!opened) {
     return (
@@ -17,36 +32,29 @@ export function BallCell({ number, ball, canDraw, onDraw }: Props) {
         type="button"
         disabled={!canDraw}
         onClick={() => onDraw(number)}
-        className={`aspect-square rounded-lg border text-sm font-semibold flex items-center justify-center transition
+        title={canDraw ? `Ball #${number} öffnen` : `Ball #${number}`}
+        className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-1 transition
           ${
             canDraw
-              ? 'border-red-500/60 bg-gradient-to-b from-red-600 to-red-800 hover:brightness-110 cursor-pointer text-white shadow'
-              : 'border-white/10 bg-neutral-800 text-neutral-500 cursor-not-allowed'
+              ? 'border-red-500/60 bg-neutral-900 hover:bg-neutral-800 hover:scale-[1.03] cursor-pointer shadow'
+              : 'border-white/10 bg-neutral-900/60 opacity-60 cursor-not-allowed'
           }`}
-        title={canDraw ? `Ball #${number} öffnen` : `Ball #${number}`}
       >
-        {number}
+        <PokeballGraphic phase="closed" size={56} />
+        <span className="text-xs font-semibold text-neutral-300">#{number}</span>
       </button>
     )
   }
 
-  const known = ball?.value != null
-  const label = known ? ball!.value! : CATEGORY_LABELS[ball!.category]
-  const colorClass = CATEGORY_COLORS[ball!.category]
-
+  // Nach dem Oeffnen bleibt die Zelle bewusst "leer" — was drin war, steht im Reveal-Banner und
+  // im Team-Slot, nicht mehr dauerhaft im Ball-Grid.
   return (
     <div
-      className={`aspect-square rounded-lg border border-white/10 ${colorClass}/30 bg-neutral-900 text-[10px] leading-tight
-        flex flex-col items-center justify-center gap-0.5 p-1 text-center`}
-      title={`Ball #${number} — ${CATEGORY_LABELS[ball!.category]}${known ? ': ' + label : ' (zensiert)'}`}
+      className="aspect-square rounded-xl border border-white/5 bg-neutral-900/30 flex flex-col items-center justify-center gap-1"
+      title={`Ball #${number} — bereits geöffnet`}
     >
-      <span className="text-neutral-500">#{number}</span>
-      <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold`}>
-        {CATEGORY_LABELS[ball!.category]}
-      </span>
-      <span className={`truncate w-full ${known ? 'text-white font-medium' : 'text-neutral-500 italic'}`}>
-        {known ? label : 'zensiert'}
-      </span>
+      <PokeballGraphic phase={justOpened ? 'opening' : 'empty'} size={justOpened ? 56 : 34} />
+      <span className="text-[10px] text-neutral-600">#{number}</span>
     </div>
   )
 }
