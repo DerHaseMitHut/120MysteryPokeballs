@@ -27,7 +27,7 @@ body {
   background-size: auto, auto, auto, cover;
   background-position: center;
   background-repeat: no-repeat;
-  filter: blur(11px) brightness(0.22) saturate(0.85);
+  filter: blur(11px) brightness(0.4) saturate(0.85);
 }
 
 ::-webkit-scrollbar {
