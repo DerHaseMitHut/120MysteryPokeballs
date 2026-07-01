@@ -15,7 +15,7 @@ function VideoTile({ tile }: { tile: CamTile }) {
   }, [tile.stream])
 
   return (
-    <div className="relative h-44 md:h-52 aspect-video overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-950 flex items-center justify-center shadow-lg shadow-black/40">
+    <div className="relative h-52 md:h-64 aspect-video overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-950 flex items-center justify-center shadow-lg shadow-black/40">
       {tile.stream ? (
         <video ref={ref} autoPlay playsInline muted={tile.isLocal} className="h-full w-full object-cover" />
       ) : (
