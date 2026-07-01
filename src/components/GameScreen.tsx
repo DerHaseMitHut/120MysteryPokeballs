@@ -8,7 +8,6 @@ import { BallsGrid } from './BallsGrid'
 import { TeamPanel } from './TeamPanel'
 import { TurnBanner } from './TurnBanner'
 import { LockButton } from './LockButton'
-import { RevealBanner } from './RevealBanner'
 import { GameOverSummary } from './GameOverSummary'
 import { HostSetupPanel } from './HostSetupPanel'
 import { WaitingPanel } from './WaitingPanel'
@@ -148,9 +147,6 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         <>
           <TurnBanner room={room} participants={participants} />
           {room.status === 'finished' && <GameOverSummary />}
-          {pendingBall && (
-            <RevealBanner ball={pendingBall} isMine={selectableCategory != null} openerName={openerName || ''} />
-          )}
           {actionError && <p className="text-center text-sm text-red-400">{actionError}</p>}
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-start">
@@ -165,7 +161,14 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
             />
 
             <div className="w-full lg:w-[500px] shrink-0">
-              <BallsGrid balls={balls} canDraw={!!canDraw} onDraw={handleDraw} />
+              <BallsGrid
+                balls={balls}
+                canDraw={!!canDraw}
+                onDraw={handleDraw}
+                revealBall={pendingBall}
+                isMine={selectableCategory != null}
+                openerName={openerName || ''}
+              />
             </div>
 
             <TeamPanel

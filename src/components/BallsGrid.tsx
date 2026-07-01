@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BallCell } from './BallCell'
+import { BallRevealOverlay } from './BallRevealOverlay'
 import type { BallWithValue } from '../hooks/useBalls'
 import { TOTAL_BALLS } from '../lib/categories'
 
@@ -9,9 +10,12 @@ interface Props {
   balls: Map<number, BallWithValue>
   canDraw: boolean
   onDraw: (number: number) => void
+  revealBall: BallWithValue | null
+  isMine: boolean
+  openerName: string
 }
 
-export function BallsGrid({ balls, canDraw, onDraw }: Props) {
+export function BallsGrid({ balls, canDraw, onDraw, revealBall, isMine, openerName }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
 
@@ -41,13 +45,23 @@ export function BallsGrid({ balls, canDraw, onDraw }: Props) {
           className="w-24 rounded-md bg-neutral-950/60 border border-white/10 focus:border-red-500/50 focus:outline-none px-2 py-1 text-sm text-white placeholder:text-neutral-500 transition-colors"
         />
       </div>
-      <div className="grid grid-cols-5 gap-2.5">
-        {pageNumbers.map((n) => (
-          <div key={n} className={highlighted === n ? 'ring-2 ring-yellow-400 rounded-xl' : undefined}>
-            <BallCell number={n} ball={balls.get(n)} canDraw={canDraw} onDraw={onDraw} />
+
+      {/* Feste 5:4-Flaeche (5 Spalten x 4 Reihen quadratischer Zellen), damit das Reveal-Overlay
+          exakt die gleiche Flaeche einnimmt, die sonst die Ball-Kacheln belegen. */}
+      <div className="relative aspect-[5/4]">
+        {revealBall ? (
+          <BallRevealOverlay ball={revealBall} isMine={isMine} openerName={openerName} />
+        ) : (
+          <div className="grid grid-cols-5 gap-2.5 h-full">
+            {pageNumbers.map((n) => (
+              <div key={n} className={highlighted === n ? 'ring-2 ring-yellow-400 rounded-xl' : undefined}>
+                <BallCell number={n} ball={balls.get(n)} canDraw={canDraw} onDraw={onDraw} />
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
+
       <div className="flex items-center justify-between text-sm">
         <button
           disabled={page === 0}
