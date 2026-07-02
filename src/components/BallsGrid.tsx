@@ -20,6 +20,7 @@ interface Props {
   // isFollower: uebernimmt eingehende Seiten automatisch (Host/OBS), eigene Blaetter-Buttons entfallen.
   isController: boolean
   isFollower: boolean
+  sfxVolume: number
 }
 
 export function BallsGrid({
@@ -33,6 +34,7 @@ export function BallsGrid({
   onRevealed,
   isController,
   isFollower,
+  sfxVolume,
 }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -47,6 +49,11 @@ export function BallsGrid({
   const pageCount = Math.ceil(TOTAL_BALLS / PER_PAGE)
   const numbers = useMemo(() => Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1), [])
   const pageNumbers = numbers.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE)
+  const openedCount = useMemo(() => {
+    let count = 0
+    for (const b of balls.values()) if (b.opened) count++
+    return count
+  }, [balls])
 
   const highlighted = search ? Number(search) : null
 
@@ -60,27 +67,52 @@ export function BallsGrid({
   // seine aktuelle Seite, Host/OBS lesen sie ueber den 'sync'-Event. Presence liefert bei jedem
   // Sync sofort den VOLLEN aktuellen Stand — anders als Broadcast-Events, die ein spaeter
   // beitretender Betrachter (z.B. OBS, erst nach dem Umblaettern geoeffnet) sonst verpassen wuerde.
+  //
+  // Ein Host-/OBS-Tab laeuft oft ueber die komplette (lange) Draft-Session im Hintergrund, wo der
+  // Realtime-Socket gelegentlich getrennt wird (Netzwerk-Hänger, Tab-Throttling). Ohne aktives
+  // Neuverbinden bliebe das Mitblaettern dann fuer den Rest der Session tot. Deshalb bei jedem
+  // nicht-SUBSCRIBED Endzustand nach kurzer Pause neu verbinden.
   useEffect(() => {
-    const channel = freshChannel(`room:${roomId}:ui`)
-    channel.on('presence', { event: 'sync' }, () => {
-      if (!isFollowerRef.current) return
-      const state = channel.presenceState<{ page: number }>()
-      for (const key in state) {
-        const entry = state[key]?.[0]
-        if (entry && typeof entry.page === 'number') {
-          setPage(entry.page)
-          break
+    let cancelled = false
+    let channel: ReturnType<typeof freshChannel> | null = null
+    let retryTimer: ReturnType<typeof setTimeout>
+
+    function connect() {
+      if (cancelled) return
+      const ch = freshChannel(`room:${roomId}:ui`)
+      channel = ch
+      ch.on('presence', { event: 'sync' }, () => {
+        if (!isFollowerRef.current) return
+        const state = ch.presenceState<{ page: number }>()
+        for (const key in state) {
+          // Presence haeuft bei mehreren track()-Aufrufen auf derselben Verbindung mehrere Metas
+          // im selben Key an (Realtime ersetzt sie nicht) — der letzte Eintrag ist der aktuelle.
+          const metas = state[key]
+          const entry = metas?.[metas.length - 1]
+          if (entry && typeof entry.page === 'number') {
+            setPage(entry.page)
+            break
+          }
         }
-      }
-    })
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channelRef.current = channel
-        if (isControllerRef.current) channel.track({ page: pageRef.current })
-      }
-    })
+      })
+      ch.subscribe((status) => {
+        if (cancelled) return
+        if (status === 'SUBSCRIBED') {
+          channelRef.current = ch
+          if (isControllerRef.current) ch.track({ page: pageRef.current })
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          channelRef.current = null
+          retryTimer = setTimeout(connect, 2000)
+        }
+      })
+    }
+
+    connect()
+
     return () => {
-      supabase.removeChannel(channel)
+      cancelled = true
+      clearTimeout(retryTimer)
+      if (channel) supabase.removeChannel(channel)
       channelRef.current = null
     }
   }, [roomId])
@@ -98,7 +130,12 @@ export function BallsGrid({
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3.5">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–120)</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–120)</h3>
+          <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2 py-0.5 text-neutral-400">
+            {openedCount}/{TOTAL_BALLS} geöffnet
+          </span>
+        </div>
         <input
           type="number"
           min={1}
@@ -114,7 +151,13 @@ export function BallsGrid({
           exakt die gleiche Flaeche einnimmt, die sonst die Ball-Kacheln belegen. */}
       <div className="relative aspect-[5/4]">
         {revealBall ? (
-          <BallRevealOverlay ball={revealBall} isMine={isMine} openerName={openerName} onRevealed={onRevealed} />
+          <BallRevealOverlay
+            ball={revealBall}
+            isMine={isMine}
+            openerName={openerName}
+            onRevealed={onRevealed}
+            sfxVolume={sfxVolume}
+          />
         ) : (
           <div className="grid grid-cols-5 gap-2.5 h-full">
             {pageNumbers.map((n) => (

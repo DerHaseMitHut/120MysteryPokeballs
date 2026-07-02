@@ -9,6 +9,7 @@ export interface RoomRow {
   obs_token: string
   status: RoomStatus
   current_turn_seat: Seat | null
+  overlay_mode: boolean
   created_at: string
 }
 
@@ -134,6 +135,9 @@ export interface Database {
       lock_team: { Args: { p_room_id: string }; Returns: void }
       claim_obs_view: { Args: { p_room_id: string; p_obs_token: string }; Returns: void }
       regenerate_obs_token: { Args: { p_room_id: string }; Returns: string }
+      set_overlay_mode: { Args: { p_room_id: string; p_enabled: boolean }; Returns: void }
+      reset_draft: { Args: { p_room_id: string }; Returns: void }
+      undo_last_action: { Args: { p_room_id: string }; Returns: void }
     }
   }
 }

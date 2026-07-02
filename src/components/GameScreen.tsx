@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRoom } from '../hooks/useRoom'
 import { useBalls } from '../hooks/useBalls'
 import { useTeamSlots } from '../hooks/useTeamSlots'
@@ -12,6 +12,8 @@ import { GameOverSummary } from './GameOverSummary'
 import { HostSetupPanel } from './HostSetupPanel'
 import { WaitingPanel } from './WaitingPanel'
 import { CopyButton } from './CopyButton'
+import { VolumeControl } from './VolumeControl'
+import { useSfxVolume } from '../hooks/useSfxVolume'
 import { rpc } from '../lib/rpc'
 import { joinUrl, obsUrl } from '../lib/urls'
 import type { Category, Seat } from '../lib/database.types'
@@ -31,6 +33,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const { slots } = useTeamSlots(roomId)
   const [camEnabled, setCamEnabled] = useState(false)
   const [revealedBallId, setRevealedBallId] = useState<string | null>(null)
+  const [sfxVolume, setSfxVolume] = useSfxVolume()
 
   const mySeat: Seat | null = role === 1 || role === 2 ? role : null
 
@@ -71,6 +74,42 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const selectableCategory: Category | null = isMyBall && isRevealed ? pendingBall!.category : null
 
   const [actionError, setActionError] = useState<string | null>(null)
+  const showOverlayStage = !!room?.overlay_mode && (role === 'host' || role === 'obs')
+  const overlayBoxRef = useRef<HTMLDivElement>(null)
+
+  // Aussenrum soll das Hintergrundbild sichtbar bleiben, nur die 16:9-Flaeche selbst muss fuer OBS
+  // echt transparent sein. Dafuer wird ein "Loch" exakt in Groesse/Position der Flaeche per
+  // clip-path aus dem fixierten .app-background-Layer ausgeschnitten (das Element selbst hat keine
+  // eigenen Kinder, ein Clip dort kann also nichts vom eigentlichen App-Inhalt mitclippen).
+  useEffect(() => {
+    if (!showOverlayStage) return
+    const appBg = document.querySelector<HTMLElement>('.app-background')
+    const box = overlayBoxRef.current
+    if (!appBg || !box) return
+
+    function update() {
+      const bgRect = appBg!.getBoundingClientRect()
+      const boxRect = box!.getBoundingClientRect()
+      const holeLeft = boxRect.left - bgRect.left
+      const holeTop = boxRect.top - bgRect.top
+      const holeRight = boxRect.right - bgRect.left
+      const holeBottom = boxRect.bottom - bgRect.top
+      appBg!.style.clipPath =
+        `path(evenodd, "M0 0H${bgRect.width}V${bgRect.height}H0Z` +
+        `M${holeLeft} ${holeTop}H${holeRight}V${holeBottom}H${holeLeft}Z")`
+    }
+
+    update()
+    window.addEventListener('resize', update)
+    const observer = new ResizeObserver(update)
+    observer.observe(box)
+
+    return () => {
+      window.removeEventListener('resize', update)
+      observer.disconnect()
+      appBg.style.clipPath = ''
+    }
+  }, [showOverlayStage])
 
   async function handleDraw(number: number) {
     setActionError(null)
@@ -100,13 +139,50 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     }
   }
 
+  async function handleToggleOverlay() {
+    if (!room) return
+    setActionError(null)
+    try {
+      await rpc.setOverlayMode(roomId, !room.overlay_mode)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function handleUndo() {
+    setActionError(null)
+    try {
+      await rpc.undoLastAction(roomId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function handleReset() {
+    if (
+      !window.confirm(
+        'Draft wirklich zurücksetzen? Geöffnete Bälle, Platzierungen und Sperren gehen verloren. Der Content-Pool und die Teilnehmer bleiben erhalten.',
+      )
+    ) {
+      return
+    }
+    setActionError(null)
+    try {
+      await rpc.resetDraft(roomId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   if (!room) return <p className="text-center text-neutral-400 py-10">Lade Raum…</p>
 
   const openerName =
     pendingBall && (participants.find((p) => p.seat === pendingBall.opened_by_seat)?.display_name ?? 'Teilnehmer')
 
   return (
-    <div className="flex flex-col gap-2.5 w-full max-w-[2100px] mx-auto p-2.5">
+    <div
+      className={`flex flex-col gap-2.5 w-full max-w-[2100px] mx-auto p-2.5 ${showOverlayStage ? 'h-screen' : ''}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="brand-title text-lg text-white tracking-tight">120 Mystery Pokéballs!</h1>
@@ -124,16 +200,43 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
             </button>
           )}
           {camError && <span className="text-xs text-red-400">{camError}</span>}
+          {role !== 'obs' && <VolumeControl volume={sfxVolume} onChange={setSfxVolume} />}
         </div>
         {role === 'host' && (
           <div className="flex items-center gap-2">
             <CopyButton value={joinUrl(room.code)} label="Einladungslink kopieren" />
             <CopyButton value={obsUrl(room.id, room.obs_token)} label="OBS-Link kopieren" />
+            {room.status !== 'setup' && (
+              <>
+                <button
+                  onClick={handleToggleOverlay}
+                  className="text-xs rounded bg-neutral-800 hover:bg-neutral-700 border border-white/10 px-2.5 py-1 text-neutral-300"
+                >
+                  {room.overlay_mode ? 'Zur normalen Ansicht' : '16:9-Overlay'}
+                </button>
+                <button
+                  onClick={handleUndo}
+                  className="text-xs rounded bg-neutral-800 hover:bg-neutral-700 border border-white/10 px-2.5 py-1 text-neutral-300"
+                >
+                  Rückgängig
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="text-xs rounded bg-red-950/40 hover:bg-red-900/50 border border-red-500/30 px-2.5 py-1 text-red-300"
+                >
+                  Reset
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
 
       <CamGrid tiles={tiles} />
+
+      {room.status !== 'setup' && actionError && (
+        <p className="text-center text-sm text-red-400">{actionError}</p>
+      )}
 
       {room.status === 'setup' ? (
         role === 'host' ? (
@@ -147,11 +250,14 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
             }
           />
         )
+      ) : showOverlayStage ? (
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+          <div ref={overlayBoxRef} className="aspect-video h-full max-w-full border-2 border-dashed border-white/40" />
+        </div>
       ) : (
         <>
           <TurnBanner room={room} participants={participants} />
           {room.status === 'finished' && <GameOverSummary />}
-          {actionError && <p className="text-center text-sm text-red-400">{actionError}</p>}
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-start">
             <TeamPanel
@@ -176,6 +282,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 onRevealed={() => pendingBall && setRevealedBallId(pendingBall.id)}
                 isController={isMyTurn}
                 isFollower={role === 'host' || role === 'obs'}
+                sfxVolume={sfxVolume}
               />
             </div>
 

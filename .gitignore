@@ -23,3 +23,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rohvideo-/Audio-Exporte im Projekt-Root: nur die tatsaechlich genutzten Kopien unter public/
+# werden von der App eingebunden, diese hier sind Zwischenexporte und gehoeren nicht ins Repo.
+/Pokeball opening .mp4
+/pokeball gif opening.mp4
+/pokeball gif opening_transparent.mov
+/pokeball gif opening_transparent_hap.mov
+/nintendo-game-boy-startup.mp3
+/sound-effects-pokemon-anime-7-pokemon-out.mp3

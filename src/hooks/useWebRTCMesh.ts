@@ -54,7 +54,7 @@ export function useWebRTCMesh(
     }
     let cancelled = false
     navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+      .getUserMedia({ video: true })
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop())
@@ -62,7 +62,7 @@ export function useWebRTCMesh(
         }
         setLocalStream(stream)
       })
-      .catch((err) => setCamError(err.message ?? 'Kamera/Mikrofon nicht verfügbar'))
+      .catch((err) => setCamError(err.message ?? 'Kamera nicht verfügbar'))
     return () => {
       cancelled = true
     }
@@ -83,7 +83,6 @@ export function useWebRTCMesh(
       if (localStream) {
         localStream.getTracks().forEach((track) => connection.addTrack(track, localStream))
       } else {
-        connection.addTransceiver('audio', { direction: 'recvonly' })
         connection.addTransceiver('video', { direction: 'recvonly' })
       }
       connection.ontrack = (event) => {

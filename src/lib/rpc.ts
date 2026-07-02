@@ -45,4 +45,11 @@ export const rpc = {
     call<void>('claim_obs_view', { p_room_id: roomId, p_obs_token: obsToken }),
 
   regenerateObsToken: (roomId: string) => call<string>('regenerate_obs_token', { p_room_id: roomId }),
+
+  setOverlayMode: (roomId: string, enabled: boolean) =>
+    call<void>('set_overlay_mode', { p_room_id: roomId, p_enabled: enabled }),
+
+  resetDraft: (roomId: string) => call<void>('reset_draft', { p_room_id: roomId }),
+
+  undoLastAction: (roomId: string) => call<void>('undo_last_action', { p_room_id: roomId }),
 }
