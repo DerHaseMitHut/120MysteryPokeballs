@@ -21,6 +21,14 @@ const SFX_LATE_CUTOFF_S = 0.6
 const FALLBACK_DURATION_S = 3
 const FADE_MS = 1000
 
+// Modul-Ebene (nicht Component-State/Ref): ueberlebt ein Re-Mount der Reveal-Overlay-Komponente
+// innerhalb desselben Tabs (z.B. falls "revealBall" durch einen kurzen Realtime-Ruckler
+// kurzzeitig null->ball->null->ball flackert) und verhindert so, dass die beiden Sound-Cues fuer
+// denselben Ball ein zweites Mal angestossen werden. Wird nur beim vollen Seiten-Reload
+// zurueckgesetzt — genau das ist gewuenscht, ein "doppelter" Sound trat nur innerhalb einer
+// laufenden Session auf.
+const sfxPlayedForBall = new Set<string>()
+
 // Spielt eine Audiodatei ab optionaler Verzoegerung ab und blendet sie optional nach einer
 // weiteren Verzoegerung linear aus. Reiner Bonus-Sound: Wiedergabefehler (Autoplay-Policy etc.)
 // werden verschluckt. Gibt eine Cleanup-Funktion zurueck, die alle Timer stoppt und den Sound
@@ -108,19 +116,22 @@ export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVol
     // Ausblendens zusammen. Reiner Bonus: bei deutlichem Verspaetungs-Nachlauf oder Autoplay-Policy
     // wird ein Cue einfach ausgelassen, ohne die Video-Wiedergabe zu beeinflussen.
     const sfxCleanups: Array<() => void> = []
-    if (lateBySeconds < SFX_LATE_CUTOFF_S) {
-      sfxCleanups.push(playAudioCue(STARTUP_SFX_SRC, { volume: sfxVolumeRef.current }))
-    }
-    const revealCueDelayS = REVEAL_SFX_DELAY_S - lateBySeconds
-    if (revealCueDelayS > -SFX_LATE_CUTOFF_S) {
-      sfxCleanups.push(
-        playAudioCue(REVEAL_SFX_SRC, {
-          delayMs: Math.max(0, revealCueDelayS * 1000),
-          volume: sfxVolumeRef.current,
-          fadeStartMs: REVEAL_SFX_FADE_START_S * 1000,
-          fadeDurationMs: REVEAL_SFX_FADE_DURATION_S * 1000,
-        }),
-      )
+    if (!sfxPlayedForBall.has(ball.id)) {
+      sfxPlayedForBall.add(ball.id)
+      if (lateBySeconds < SFX_LATE_CUTOFF_S) {
+        sfxCleanups.push(playAudioCue(STARTUP_SFX_SRC, { volume: sfxVolumeRef.current }))
+      }
+      const revealCueDelayS = REVEAL_SFX_DELAY_S - lateBySeconds
+      if (revealCueDelayS > -SFX_LATE_CUTOFF_S) {
+        sfxCleanups.push(
+          playAudioCue(REVEAL_SFX_SRC, {
+            delayMs: Math.max(0, revealCueDelayS * 1000),
+            volume: sfxVolumeRef.current,
+            fadeStartMs: REVEAL_SFX_FADE_START_S * 1000,
+            fadeDurationMs: REVEAL_SFX_FADE_DURATION_S * 1000,
+          }),
+        )
+      }
     }
 
     let revealTimer: ReturnType<typeof setTimeout>
@@ -192,24 +203,24 @@ export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVol
           pointerEvents: revealing || videoFailed ? 'auto' : 'none',
         }}
       >
-        <span className="text-xs text-neutral-400">
+        <span className="text-sm text-neutral-400">
           Ball #{ball.number} geöffnet von {openerName}
         </span>
-        <span className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${colorClass}`}>
+        <span className={`px-3.5 py-1.5 rounded-lg text-base font-semibold text-white ${colorClass}`}>
           {CATEGORY_LABELS[ball.category]}
         </span>
         {spriteUrl && (
           <img
             src={spriteUrl}
             alt={ball.value ?? ''}
-            className="h-28 w-28 object-contain [image-rendering:pixelated] drop-shadow-lg"
+            className="h-44 w-44 object-contain [image-rendering:pixelated] drop-shadow-lg"
           />
         )}
-        <span className={`text-3xl font-extrabold ${known ? 'text-white' : 'text-neutral-500 italic'}`}>
+        <span className={`text-4xl font-extrabold ${known ? 'text-white' : 'text-neutral-500 italic'}`}>
           {known ? ball.value : 'zensiert'}
         </span>
         {isMine ? (
-          <span className="text-sm text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
+          <span className="text-base text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
         ) : (
           <span className="text-sm text-neutral-500 mt-1">wird gerade platziert…</span>
         )}

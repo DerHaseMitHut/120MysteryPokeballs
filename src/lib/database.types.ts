@@ -6,6 +6,7 @@ export interface RoomRow {
   id: string
   code: string
   host_user_id: string
+  host_display_name: string | null
   obs_token: string
   status: RoomStatus
   current_turn_seat: Seat | null
@@ -138,6 +139,8 @@ export interface Database {
       set_overlay_mode: { Args: { p_room_id: string; p_enabled: boolean }; Returns: void }
       reset_draft: { Args: { p_room_id: string }; Returns: void }
       undo_last_action: { Args: { p_room_id: string }; Returns: void }
+      set_display_name: { Args: { p_room_id: string; p_display_name: string }; Returns: RoomParticipantRow }
+      set_host_display_name: { Args: { p_room_id: string; p_display_name: string }; Returns: void }
     }
   }
 }

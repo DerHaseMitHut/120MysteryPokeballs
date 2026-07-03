@@ -3,11 +3,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 
 type RtcSignal =
-  | { kind: 'join'; from: string }
   | { kind: 'offer'; from: string; to: string; sdp: string }
   | { kind: 'answer'; from: string; to: string; sdp: string }
   | { kind: 'ice-candidate'; from: string; to: string; candidate: RTCIceCandidateInit }
-  | { kind: 'leave'; from: string }
 
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -70,7 +68,6 @@ export function useWebRTCMesh(
 
   useEffect(() => {
     if (!roomId || !myPeerId) return
-    if (!receiveOnly && !localStream) return
 
     const channel = freshChannel(`room:${roomId}:rtc`, { config: { broadcast: { self: false } } })
     channelRef.current = channel
@@ -119,17 +116,16 @@ export function useWebRTCMesh(
       channel.send({ type: 'broadcast', event: 'rtc-signal', payload: signal })
     }
 
+    async function offerTo(otherId: string) {
+      const peer = getOrCreatePeer(otherId)
+      const offer = await peer.connection.createOffer()
+      await peer.connection.setLocalDescription(offer)
+      send({ kind: 'offer', from: myPeerId!, to: otherId, sdp: offer.sdp! })
+    }
+
     async function handleSignal(signal: RtcSignal) {
-      if ('to' in signal && signal.to !== myPeerId) return
-      if (signal.kind === 'join') {
-        if (signal.from === myPeerId) return
-        const peer = getOrCreatePeer(signal.from)
-        if (myPeerId! < signal.from) {
-          const offer = await peer.connection.createOffer()
-          await peer.connection.setLocalDescription(offer)
-          send({ kind: 'offer', from: myPeerId!, to: signal.from, sdp: offer.sdp! })
-        }
-      } else if (signal.kind === 'offer') {
+      if (signal.to !== myPeerId) return
+      if (signal.kind === 'offer') {
         const peer = getOrCreatePeer(signal.from)
         await peer.connection.setRemoteDescription({ type: 'offer', sdp: signal.sdp })
         await flushPendingCandidates(signal.from, peer)
@@ -151,8 +147,6 @@ export function useWebRTCMesh(
           queue.push(signal.candidate)
           pendingCandidatesRef.current.set(signal.from, queue)
         }
-      } else if (signal.kind === 'leave') {
-        teardownPeer(signal.from)
       }
     }
 
@@ -165,10 +159,31 @@ export function useWebRTCMesh(
       pendingCandidatesRef.current.delete(otherId)
     }
 
+    // Peer-Erkennung ueber Presence statt eines eigenen "join"-Broadcasts: ein 'sync'-Event
+    // liefert bei JEDEM Subscriber (auch spaet dazustossenden) immer den VOLLEN aktuellen
+    // Mitgliederstand, nicht nur ein einmaliges Ereignis. Ein Broadcast dagegen wird verpasst,
+    // wenn der Empfaenger im Sende-Moment noch nicht fertig subscribed ist — genau das war die
+    // Ursache dafuer, dass Kameras teils erst nach einem Reload auftauchten. Damit nicht beide
+    // Seiten gleichzeitig ein Offer schicken, bietet bei jedem entdeckten Paar nur die Seite mit
+    // der (lexikografisch) kleineren Peer-Id an.
+    function handlePresenceSync() {
+      const state = channel.presenceState<{ peerId: string }>()
+      for (const key in state) {
+        const metas = state[key]
+        const entry = metas?.[metas.length - 1]
+        const otherId = entry?.peerId
+        if (!otherId || otherId === myPeerId || peersRef.current.has(otherId)) continue
+        if (myPeerId! < otherId) {
+          offerTo(otherId).catch((err) => console.error('RTC-Offer Fehler', err))
+        }
+      }
+    }
+
     channel
       .on('broadcast', { event: 'rtc-signal' }, ({ payload }) => {
         handleSignal(payload as RtcSignal).catch((err) => console.error('RTC-Signal Fehler', err))
       })
+      .on('presence', { event: 'sync' }, handlePresenceSync)
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         for (const p of leftPresences as unknown as { peerId: string }[]) {
           teardownPeer(p.peerId)
@@ -177,18 +192,16 @@ export function useWebRTCMesh(
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ peerId: myPeerId })
-          send({ kind: 'join', from: myPeerId! })
         }
       })
 
     return () => {
-      send({ kind: 'leave', from: myPeerId! })
       for (const id of Array.from(peersRef.current.keys())) teardownPeer(id)
       supabase.removeChannel(channel)
       channelRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, myPeerId, localStream, receiveOnly])
+  }, [roomId, myPeerId, localStream])
 
   return { localStream, remoteStreams, camError }
 }

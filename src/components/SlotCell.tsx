@@ -1,16 +1,19 @@
 import { CATEGORY_COLORS, CATEGORY_FILLED_STYLE, CATEGORY_LABELS } from '../lib/categories'
+import { useFlashOnChange } from '../hooks/useFlashOnChange'
 import type { Category } from '../lib/database.types'
 
 interface Props {
   slotType: Category
   value: string | null
   filled: boolean
+  ballId?: string | null
   selectable?: boolean
   onSelect?: () => void
 }
 
-export function SlotCell({ slotType, value, filled, selectable, onSelect }: Props) {
+export function SlotCell({ slotType, value, filled, ballId = null, selectable, onSelect }: Props) {
   const colorClass = CATEGORY_COLORS[slotType]
+  const flashing = useFlashOnChange(ballId)
 
   const content = !filled ? (
     <span className="text-neutral-600 italic leading-tight">leer</span>
@@ -31,7 +34,7 @@ export function SlotCell({ slotType, value, filled, selectable, onSelect }: Prop
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-3 py-2 min-h-[3.25rem] text-sm flex flex-col items-start justify-center gap-1 text-left transition ${stateClass}`}
+      className={`w-full rounded-md border px-3 py-2.5 min-h-[3.75rem] text-sm flex flex-col items-start justify-center gap-1 text-left transition ${stateClass} ${flashing ? 'slot-flash' : ''}`}
     >
       <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold leading-tight`}>
         {CATEGORY_LABELS[slotType]}

@@ -52,4 +52,10 @@ export const rpc = {
   resetDraft: (roomId: string) => call<void>('reset_draft', { p_room_id: roomId }),
 
   undoLastAction: (roomId: string) => call<void>('undo_last_action', { p_room_id: roomId }),
+
+  setDisplayName: (roomId: string, displayName: string) =>
+    call<RoomParticipantRow>('set_display_name', { p_room_id: roomId, p_display_name: displayName }),
+
+  setHostDisplayName: (roomId: string, displayName: string) =>
+    call<void>('set_host_display_name', { p_room_id: roomId, p_display_name: displayName }),
 }

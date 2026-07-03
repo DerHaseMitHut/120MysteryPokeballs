@@ -19,6 +19,7 @@ export function FieldCard({ fieldIndex, slots, selectableCategory, onSelectSlot 
     return {
       value: slot?.value ?? null,
       filled: !!slot?.filled_ball_id,
+      ballId: slot?.filled_ball_id ?? null,
       selectable,
       onSelect: selectable ? () => onSelectSlot!(slotType, slotOrdinal) : undefined,
     }

@@ -4,6 +4,7 @@ import { BallRevealOverlay } from './BallRevealOverlay'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallWithValue } from '../hooks/useBalls'
 import { TOTAL_BALLS } from '../lib/categories'
+import type { Seat } from '../lib/database.types'
 
 const PER_PAGE = 20
 
@@ -17,9 +18,13 @@ interface Props {
   openerName: string
   onRevealed?: () => void
   // isController: aktiver ziehender Teilnehmer — dessen Seiten-Navigation wird gebroadcastet.
-  // isFollower: uebernimmt eingehende Seiten automatisch (Host/OBS), eigene Blaetter-Buttons entfallen.
+  // isFollower: uebernimmt eingehende Seiten automatisch, eigene Blaetter-Buttons entfallen.
   isController: boolean
   isFollower: boolean
+  // mySeat: eigener Sitzplatz (null fuer Host/OBS) — wird beim Tracken mitgesendet, damit
+  // Follower gezielt den Eintrag des aktiven Spielers auswaehlen koennen statt "irgendeinen".
+  mySeat: Seat | null
+  activeSeat: Seat | null
   sfxVolume: number
 }
 
@@ -34,6 +39,8 @@ export function BallsGrid({
   onRevealed,
   isController,
   isFollower,
+  mySeat,
+  activeSeat,
   sfxVolume,
 }: Props) {
   const [search, setSearch] = useState('')
@@ -45,6 +52,10 @@ export function BallsGrid({
   isControllerRef.current = isController
   const pageRef = useRef(page)
   pageRef.current = page
+  const mySeatRef = useRef(mySeat)
+  mySeatRef.current = mySeat
+  const activeSeatRef = useRef(activeSeat)
+  activeSeatRef.current = activeSeat
 
   const pageCount = Math.ceil(TOTAL_BALLS / PER_PAGE)
   const numbers = useMemo(() => Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1), [])
@@ -83,13 +94,16 @@ export function BallsGrid({
       channel = ch
       ch.on('presence', { event: 'sync' }, () => {
         if (!isFollowerRef.current) return
-        const state = ch.presenceState<{ page: number }>()
+        const state = ch.presenceState<{ page: number; seat: number | null }>()
         for (const key in state) {
           // Presence haeuft bei mehreren track()-Aufrufen auf derselben Verbindung mehrere Metas
           // im selben Key an (Realtime ersetzt sie nicht) — der letzte Eintrag ist der aktuelle.
+          // Gezielt nach dem Eintrag des GERADE aktiven Spielers suchen (statt "irgendeinen"
+          // Eintrag zu nehmen) — sonst kann ein kurzzeitig noch praesenter, veralteter Eintrag
+          // (z.B. vom vorigen Zug) die eigentliche Aktualisierung ueberschreiben/verdecken.
           const metas = state[key]
           const entry = metas?.[metas.length - 1]
-          if (entry && typeof entry.page === 'number') {
+          if (entry && typeof entry.page === 'number' && entry.seat === activeSeatRef.current) {
             setPage(entry.page)
             break
           }
@@ -99,7 +113,7 @@ export function BallsGrid({
         if (cancelled) return
         if (status === 'SUBSCRIBED') {
           channelRef.current = ch
-          if (isControllerRef.current) ch.track({ page: pageRef.current })
+          if (isControllerRef.current) ch.track({ page: pageRef.current, seat: mySeatRef.current })
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           channelRef.current = null
           retryTimer = setTimeout(connect, 2000)
@@ -121,11 +135,11 @@ export function BallsGrid({
     const channel = channelRef.current
     if (!channel) return
     if (isController) {
-      channel.track({ page })
+      channel.track({ page, seat: mySeat })
     } else {
       channel.untrack()
     }
-  }, [isController, page])
+  }, [isController, page, mySeat])
 
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3.5">

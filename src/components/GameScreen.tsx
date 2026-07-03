@@ -12,6 +12,7 @@ import { GameOverSummary } from './GameOverSummary'
 import { HostSetupPanel } from './HostSetupPanel'
 import { WaitingPanel } from './WaitingPanel'
 import { CopyButton } from './CopyButton'
+import { EditableName } from './EditableName'
 import { VolumeControl } from './VolumeControl'
 import { useSfxVolume } from '../hooks/useSfxVolume'
 import { rpc } from '../lib/rpc'
@@ -51,7 +52,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     }
     return [
       tileFor('seat1', seat1?.display_name || 'Teilnehmer 1', seat1?.user_id),
-      tileFor('host', 'Host', room?.host_user_id),
+      tileFor('host', room?.host_display_name || 'Host', room?.host_user_id),
       tileFor('seat2', seat2?.display_name || 'Teilnehmer 2', seat2?.user_id),
     ]
   }, [seat1, seat2, room, localStream, remoteStreams, myUserId, role])
@@ -191,6 +192,17 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               Code: {room.code}
             </span>
           )}
+          {role === 'host' && (
+            <span className="flex items-center gap-1.5 text-xs rounded-full bg-neutral-800 border border-white/10 px-2.5 py-0.5 text-neutral-300">
+              <span className="text-neutral-500">Dein Name:</span>
+              <EditableName
+                value={room.host_display_name ?? ''}
+                placeholder="Host"
+                onSave={(name) => rpc.setHostDisplayName(roomId, name)}
+                className="text-neutral-200 hover:text-yellow-300 underline decoration-dotted decoration-neutral-500 underline-offset-2 transition-colors"
+              />
+            </span>
+          )}
           {showControls && role !== 'obs' && (
             <button
               onClick={() => setCamEnabled((v) => !v)}
@@ -268,6 +280,8 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               slots={slots.filter((s) => s.seat === 1)}
               selectableCategory={mySeat === 1 ? selectableCategory : null}
               onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
+              editable={mySeat === 1}
+              onRename={mySeat === 1 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
             />
 
             <div className="w-full lg:w-[500px] shrink-0">
@@ -281,7 +295,9 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 openerName={openerName || ''}
                 onRevealed={() => pendingBall && setRevealedBallId(pendingBall.id)}
                 isController={isMyTurn}
-                isFollower={role === 'host' || role === 'obs'}
+                isFollower={room.status === 'drafting' && !isMyTurn}
+                mySeat={mySeat}
+                activeSeat={room.current_turn_seat}
                 sfxVolume={sfxVolume}
               />
             </div>
@@ -294,6 +310,8 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               slots={slots.filter((s) => s.seat === 2)}
               selectableCategory={mySeat === 2 ? selectableCategory : null}
               onSelectSlot={mySeat === 2 ? handleSelectSlot : undefined}
+              editable={mySeat === 2}
+              onRename={mySeat === 2 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
               align="right"
             />
           </div>
