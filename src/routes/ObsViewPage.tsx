@@ -5,6 +5,7 @@ import { GameScreen } from '../components/GameScreen'
 import { rpc } from '../lib/rpc'
 
 const WIDTH = 1920
+const MIN_SCALE = 0.3 // Untergrenze -- verhindert ein Aufschaukeln bis auf (fast) 0
 
 export function ObsViewPage() {
   const { roomId = '', token = '' } = useParams()
@@ -12,8 +13,6 @@ export function ObsViewPage() {
   const [claimed, setClaimed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scale, setScale] = useState(1)
-  const scaleRef = useRef(scale)
-  scaleRef.current = scale
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -26,9 +25,11 @@ export function ObsViewPage() {
 
   // Skaliert so, dass der Inhalt (Cams + Teams + Ballgrid, dessen Hoehe je nach Anzahl aktiver
   // Kameras/Inhalt variiert) IMMER komplett innerhalb 1920x1080 sichtbar bleibt, statt bei
-  // ueberlangem Inhalt unten abgeschnitten zu werden. "zoom" layoutet nativ neu (bleibt scharf),
-  // beeinflusst dabei aber auch die von ResizeObserver gemessene Groesse -- deshalb hier durch den
-  // aktuell angewendeten Zoom zurueckgerechnet auf die "natuerliche" (ungezoomte) Inhaltshoehe.
+  // ueberlangem Inhalt unten abgeschnitten zu werden. "zoom" layoutet nativ neu (bleibt scharf).
+  // Der aktuell angewendete Zoom wird NICHT aus eigenem State zurueckgerechnet (das hatte sich in
+  // der ersten Version bei kleinen Timing-Abweichungen selbst hochgeschaukelt, bis der Inhalt
+  // gegen 0 lief) -- stattdessen direkt aus der gemessenen Breite abgeleitet (rect.width / WIDTH),
+  // die immer der Wahrheit entspricht, unabhaengig von React-Timing.
   useEffect(() => {
     const el = contentRef.current
     // Vor "claimed" ist das Inhalts-Div (mit dieser ref) noch gar nicht gemountet (die Seite
@@ -36,17 +37,31 @@ export function ObsViewPage() {
     // beim allerersten (leeren) Mount laufen und nie wieder, der Observer haette also nie ein
     // echtes Element zum Beobachten.
     if (!el) return
+    let debounceTimer: ReturnType<typeof setTimeout>
     function recompute() {
-      const zoomedHeight = el!.getBoundingClientRect().height
-      const naturalHeight = zoomedHeight / (scaleRef.current || 1)
-      const next = Math.min(window.innerWidth / WIDTH, window.innerHeight / Math.max(naturalHeight, 1), 1)
-      setScale((prev) => (Math.abs(prev - next) > 0.002 ? next : prev))
+      const rect = el!.getBoundingClientRect()
+      if (rect.width < 1) return // noch nicht gelayoutet/unsichtbar -- Messung ueberspringen
+      const appliedScale = rect.width / WIDTH
+      const naturalHeight = rect.height / appliedScale
+      const next = Math.max(
+        MIN_SCALE,
+        Math.min(window.innerWidth / WIDTH, window.innerHeight / Math.max(naturalHeight, 1), 1),
+      )
+      // Grosszuegige Toleranz + Debounce: viele einzelne Bilder (Baelle, Sprites) laden
+      // nacheinander und loesen je einen Resize aus -- ohne das wuerde jede minimale
+      // Rundungsabweichung sofort eine neue (leicht andere) Zoomstufe anwenden, was sich durch
+      // die dadurch selbst ausgeloesten Folge-Resizes langsam aufschaukeln kann.
+      clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        setScale((prev) => (Math.abs(prev - next) > 0.02 ? next : prev))
+      }, 150)
     }
     recompute()
     const ro = new ResizeObserver(recompute)
     ro.observe(el)
     window.addEventListener('resize', recompute)
     return () => {
+      clearTimeout(debounceTimer)
       ro.disconnect()
       window.removeEventListener('resize', recompute)
     }
