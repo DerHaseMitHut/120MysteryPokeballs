@@ -26,12 +26,15 @@ export const CATEGORY_FILLED_STYLE: Record<Category, string> = {
   attacke: 'bg-rose-500/15 border-rose-500/50',
 }
 
-export const POOL_REQUIREMENTS: Record<Category, number> = {
-  pokemon: 20,
-  item: 15,
-  wesen: 15,
-  faehigkeit: 15,
-  attacke: 55,
+// Ergibt sich aus dem unveraenderten Team-Slot-Layout (2 Sitze x 4 Felder x je 1
+// Pokemon/Wesen/Faehigkeit/Item + 4 Attacke): ohne diese Mindestanzahl pro Kategorie waeren
+// manche Team-Slots nie befuellbar. Wird serverseitig in set_content_pool() identisch geprueft.
+export const SLOT_MINIMUMS: Record<Category, number> = {
+  pokemon: 8,
+  item: 8,
+  wesen: 8,
+  faehigkeit: 8,
+  attacke: 32,
 }
 
 export const CATEGORY_ORDER: Category[] = ['pokemon', 'wesen', 'faehigkeit', 'item', 'attacke']
@@ -47,5 +50,3 @@ export const FIELD_SLOT_LAYOUT: { slot_type: Category; slot_ordinal: number }[] 
   { slot_type: 'attacke', slot_ordinal: 3 },
   { slot_type: 'attacke', slot_ordinal: 4 },
 ]
-
-export const TOTAL_BALLS = 120

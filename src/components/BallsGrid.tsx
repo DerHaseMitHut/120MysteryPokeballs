@@ -3,7 +3,6 @@ import { BallCell } from './BallCell'
 import { BallRevealOverlay } from './BallRevealOverlay'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallWithValue } from '../hooks/useBalls'
-import { TOTAL_BALLS } from '../lib/categories'
 import type { Seat } from '../lib/database.types'
 
 const PER_PAGE = 20
@@ -11,6 +10,7 @@ const PER_PAGE = 20
 interface Props {
   roomId: string
   balls: Map<number, BallWithValue>
+  totalBalls: number
   canDraw: boolean
   onDraw: (number: number) => void
   revealBall: BallWithValue | null
@@ -31,6 +31,7 @@ interface Props {
 export function BallsGrid({
   roomId,
   balls,
+  totalBalls,
   canDraw,
   onDraw,
   revealBall,
@@ -57,8 +58,8 @@ export function BallsGrid({
   const activeSeatRef = useRef(activeSeat)
   activeSeatRef.current = activeSeat
 
-  const pageCount = Math.ceil(TOTAL_BALLS / PER_PAGE)
-  const numbers = useMemo(() => Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1), [])
+  const pageCount = Math.ceil(totalBalls / PER_PAGE)
+  const numbers = useMemo(() => Array.from({ length: totalBalls }, (_, i) => i + 1), [totalBalls])
   const pageNumbers = numbers.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE)
   const openedCount = useMemo(() => {
     let count = 0
@@ -69,10 +70,10 @@ export function BallsGrid({
   const highlighted = search ? Number(search) : null
 
   useEffect(() => {
-    if (highlighted && highlighted >= 1 && highlighted <= TOTAL_BALLS) {
+    if (highlighted && highlighted >= 1 && highlighted <= totalBalls) {
       setPage(Math.floor((highlighted - 1) / PER_PAGE))
     }
-  }, [highlighted])
+  }, [highlighted, totalBalls])
 
   // Presence (nicht Broadcast!) fuer die Seiten-Synchronisation: der aktive Teilnehmer "trackt"
   // seine aktuelle Seite, Host/OBS lesen sie ueber den 'sync'-Event. Presence liefert bei jedem
@@ -145,15 +146,15 @@ export function BallsGrid({
     <div className="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-neutral-900/50 shadow-xl shadow-black/30 backdrop-blur-sm p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–120)</h3>
+          <h3 className="text-sm font-semibold text-neutral-300">Pokébälle (1–{totalBalls})</h3>
           <span className="text-xs font-mono rounded-full bg-neutral-800 border border-white/10 px-2 py-0.5 text-neutral-400">
-            {openedCount}/{TOTAL_BALLS} geöffnet
+            {openedCount}/{totalBalls} geöffnet
           </span>
         </div>
         <input
           type="number"
           min={1}
-          max={120}
+          max={totalBalls}
           placeholder="Nr. suchen"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -196,7 +197,7 @@ export function BallsGrid({
           </button>
         )}
         <span className="text-neutral-500 text-xs">
-          Seite {page + 1} / {pageCount} · Bälle {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, TOTAL_BALLS)}
+          Seite {page + 1} / {pageCount} · Bälle {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, totalBalls)}
         </span>
         {!isFollower && (
           <button

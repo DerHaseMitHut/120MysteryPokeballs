@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ContentPoolForm, EMPTY_POOL_TEXTS, isPoolValid, parsePoolTexts, type PoolTexts } from './ContentPoolForm'
+import { PoolConfigPanel } from './PoolConfigPanel'
+import { defaultPoolConfig, resolvePool, validatePoolConfig, type PoolConfig } from '../lib/poolResolution'
 import { InviteLinksPanel } from './InviteLinksPanel'
 import { rpc } from '../lib/rpc'
 import type { RoomParticipantRow, RoomRow, Seat } from '../lib/database.types'
@@ -10,19 +11,19 @@ interface Props {
 }
 
 export function HostSetupPanel({ room, participants }: Props) {
-  const [poolTexts, setPoolTexts] = useState<PoolTexts>(EMPTY_POOL_TEXTS)
+  const [poolConfig, setPoolConfig] = useState<PoolConfig>(defaultPoolConfig())
   const [startingSeat, setStartingSeat] = useState<Seat>(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const bothJoined = participants.length === 2 && participants.every((p) => p.user_id)
-  const poolValid = isPoolValid(poolTexts)
+  const validationErrors = validatePoolConfig(poolConfig)
 
   async function handleStart() {
     setBusy(true)
     setError(null)
     try {
-      await rpc.setContentPool(room.id, parsePoolTexts(poolTexts))
+      await rpc.setContentPool(room.id, resolvePool(poolConfig))
       await rpc.startGame(room.id, startingSeat)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -38,11 +39,11 @@ export function HostSetupPanel({ room, participants }: Props) {
         <div>
           <h2 className="text-lg font-bold text-white">Inhalts-Pool</h2>
           <p className="text-sm text-neutral-400 mt-0.5">
-            Trage pro Kategorie einen Wert pro Zeile ein. Diese 120 Werte werden beim Spielstart zufällig auf die
-            Pokébälle verteilt.
+            Lege pro Kategorie Anzahl und Auswahlmodus fest (zufällig oder manuell, bei Pokémon zusätzlich mit
+            Filtern). Diese Werte werden beim Spielstart zufällig auf die Pokébälle verteilt.
           </p>
         </div>
-        <ContentPoolForm value={poolTexts} onChange={setPoolTexts} />
+        <PoolConfigPanel value={poolConfig} onChange={setPoolConfig} />
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/30 backdrop-blur-sm p-5">
@@ -62,12 +63,19 @@ export function HostSetupPanel({ room, participants }: Props) {
             </button>
           ))}
         </div>
+        {validationErrors.length > 0 && (
+          <ul className="text-xs text-amber-400 list-disc list-inside">
+            {validationErrors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        )}
         <button
-          disabled={!bothJoined || !poolValid || busy}
+          disabled={!bothJoined || validationErrors.length > 0 || busy}
           onClick={handleStart}
           className="self-start rounded-lg bg-gradient-to-b from-red-500 to-red-700 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 shadow-lg shadow-red-900/30 transition"
         >
-          {busy ? 'Startet…' : !bothJoined ? 'Warte auf beide Teilnehmer…' : !poolValid ? 'Pool noch unvollständig' : 'Spiel starten'}
+          {busy ? 'Startet…' : !bothJoined ? 'Warte auf beide Teilnehmer…' : validationErrors.length > 0 ? 'Pool noch unvollständig' : 'Spiel starten'}
         </button>
         {error && <p className="text-sm text-red-400">{error}</p>}
       </div>

@@ -288,6 +288,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               <BallsGrid
                 roomId={roomId}
                 balls={balls}
+                totalBalls={balls.size}
                 canDraw={!!canDraw}
                 onDraw={handleDraw}
                 revealBall={pendingBall}
