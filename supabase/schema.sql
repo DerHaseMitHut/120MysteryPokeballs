@@ -48,7 +48,7 @@ create table public.content_pool (
 create table public.balls (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.rooms(id) on delete cascade,
-  number int not null check (number between 1 and 120),
+  number int not null check (number > 0),
   category text not null check (category in ('pokemon', 'item', 'wesen', 'faehigkeit', 'attacke')),
   opened boolean not null default false,
   opened_by_seat int check (opened_by_seat in (1, 2)),
@@ -220,8 +220,9 @@ begin
 end;
 $$;
 
--- Setzt/ersetzt den 120er-Pool eines Raums, solange dieser noch im Setup ist. Kann beliebig oft
--- aufgerufen werden (z.B. waehrend der Host noch tippt und die Teilnehmer schon warten).
+-- Setzt/ersetzt den Pool eines Raums (Groesse vom Host frei konfiguriert), solange dieser noch im
+-- Setup ist. Kann beliebig oft aufgerufen werden (z.B. waehrend der Host noch tippt und die
+-- Teilnehmer schon warten).
 create or replace function public.set_content_pool(p_room_id uuid, p_pool jsonb)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -251,9 +252,18 @@ begin
     into v_count_pokemon, v_count_item, v_count_wesen, v_count_faehigkeit, v_count_attacke, v_total
     from jsonb_array_elements(p_pool) as value;
 
-  if v_total <> 120 or v_count_pokemon <> 20 or v_count_item <> 15 or v_count_wesen <> 15
-     or v_count_faehigkeit <> 15 or v_count_attacke <> 55 then
-    raise exception 'Pool muss genau 20 Pokemon, 15 Item, 15 Wesen, 15 Faehigkeit, 55 Attacke enthalten (erhalten: % gesamt)', v_total;
+  -- Keine fixen 120/20/15/15/15/55 mehr: Host konfiguriert Gesamtzahl und Verteilung frei. Die
+  -- Minima 8/8/8/8/32 ergeben sich aus dem unveraenderten Team-Slot-Layout (2 Sitze x 4 Felder x
+  -- je 1 Pokemon/Wesen/Faehigkeit/Item + 4 Attacke) -- ohne sie waeren manche Slots nie befuellbar.
+  if v_total < 1 or v_total <> (v_count_pokemon + v_count_item + v_count_wesen + v_count_faehigkeit + v_count_attacke) then
+    raise exception 'Ungueltiger Pool';
+  end if;
+  if v_count_pokemon < 8 or v_count_wesen < 8 or v_count_faehigkeit < 8 or v_count_item < 8 then
+    raise exception 'Mindestens 8 Eintraege pro Kategorie (Pokemon/Wesen/Faehigkeit/Item) noetig, um alle Team-Slots befuellen zu koennen (erhalten: Pokemon %, Wesen %, Faehigkeit %, Item %)',
+      v_count_pokemon, v_count_wesen, v_count_faehigkeit, v_count_item;
+  end if;
+  if v_count_attacke < 32 then
+    raise exception 'Mindestens 32 Attacken noetig, um alle Team-Slots befuellen zu koennen (erhalten: %)', v_count_attacke;
   end if;
 
   delete from content_pool where room_id = p_room_id;
@@ -398,11 +408,11 @@ begin
   end if;
 
   select count(*) into v_pool_count from content_pool where room_id = p_room_id;
-  if v_pool_count <> 120 then
-    raise exception 'Pool ist unvollstaendig (% von 120)', v_pool_count;
+  if v_pool_count < 1 then
+    raise exception 'Pool ist leer';
   end if;
 
-  -- Zufaellige Zuordnung: Pool-Eintraege serverseitig mischen und auf Baelle 1..120 verteilen.
+  -- Zufaellige Zuordnung: Pool-Eintraege serverseitig mischen und auf Baelle 1..N verteilen.
   with shuffled as (
     select id as pool_id, category, value, row_number() over (order by random()) as rn
     from content_pool where room_id = p_room_id
