@@ -30,23 +30,27 @@ export function ObsViewPage() {
   // beeinflusst dabei aber auch die von ResizeObserver gemessene Groesse -- deshalb hier durch den
   // aktuell angewendeten Zoom zurueckgerechnet auf die "natuerliche" (ungezoomte) Inhaltshoehe.
   useEffect(() => {
+    const el = contentRef.current
+    // Vor "claimed" ist das Inhalts-Div (mit dieser ref) noch gar nicht gemountet (die Seite
+    // zeigt bis dahin nur "Lade…"/"Verbinde…") -- ohne "claimed" in den Deps wuerde dieser Effekt
+    // beim allerersten (leeren) Mount laufen und nie wieder, der Observer haette also nie ein
+    // echtes Element zum Beobachten.
+    if (!el) return
     function recompute() {
-      const el = contentRef.current
-      if (!el) return
-      const zoomedHeight = el.getBoundingClientRect().height
+      const zoomedHeight = el!.getBoundingClientRect().height
       const naturalHeight = zoomedHeight / (scaleRef.current || 1)
       const next = Math.min(window.innerWidth / WIDTH, window.innerHeight / Math.max(naturalHeight, 1), 1)
       setScale((prev) => (Math.abs(prev - next) > 0.002 ? next : prev))
     }
     recompute()
     const ro = new ResizeObserver(recompute)
-    if (contentRef.current) ro.observe(contentRef.current)
+    ro.observe(el)
     window.addEventListener('resize', recompute)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', recompute)
     }
-  }, [])
+  }, [claimed])
 
   if (sessionLoading || !userId) return <p className="text-center text-neutral-400 py-10">Lade…</p>
   if (error) return <p className="text-center text-red-400 py-10">{error}</p>
