@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAnonymousSession } from '../hooks/useAnonymousSession'
 import { GameScreen } from '../components/GameScreen'
 import { rpc } from '../lib/rpc'
 
 const WIDTH = 1920
-const HEIGHT = 1080
 
 export function ObsViewPage() {
   const { roomId = '', token = '' } = useParams()
@@ -13,6 +12,9 @@ export function ObsViewPage() {
   const [claimed, setClaimed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scale, setScale] = useState(1)
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!userId) return
@@ -22,13 +24,28 @@ export function ObsViewPage() {
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [userId, roomId, token])
 
+  // Skaliert so, dass der Inhalt (Cams + Teams + Ballgrid, dessen Hoehe je nach Anzahl aktiver
+  // Kameras/Inhalt variiert) IMMER komplett innerhalb 1920x1080 sichtbar bleibt, statt bei
+  // ueberlangem Inhalt unten abgeschnitten zu werden. "zoom" layoutet nativ neu (bleibt scharf),
+  // beeinflusst dabei aber auch die von ResizeObserver gemessene Groesse -- deshalb hier durch den
+  // aktuell angewendeten Zoom zurueckgerechnet auf die "natuerliche" (ungezoomte) Inhaltshoehe.
   useEffect(() => {
-    function updateScale() {
-      setScale(Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT, 1))
+    function recompute() {
+      const el = contentRef.current
+      if (!el) return
+      const zoomedHeight = el.getBoundingClientRect().height
+      const naturalHeight = zoomedHeight / (scaleRef.current || 1)
+      const next = Math.min(window.innerWidth / WIDTH, window.innerHeight / Math.max(naturalHeight, 1), 1)
+      setScale((prev) => (Math.abs(prev - next) > 0.002 ? next : prev))
     }
-    updateScale()
-    window.addEventListener('resize', updateScale)
-    return () => window.removeEventListener('resize', updateScale)
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    if (contentRef.current) ro.observe(contentRef.current)
+    window.addEventListener('resize', recompute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recompute)
+    }
   }, [])
 
   if (sessionLoading || !userId) return <p className="text-center text-neutral-400 py-10">Lade…</p>
@@ -42,11 +59,10 @@ export function ObsViewPage() {
           und bleibt dadurch scharf. In Chromium/CEF unterstuetzt — deckt sowohl OBS als auch
           normale Chromium-Browser ab. */}
       <div
+        ref={contentRef}
         style={{
           width: WIDTH,
-          height: HEIGHT,
           zoom: scale,
-          overflow: 'hidden',
         }}
       >
         <GameScreen roomId={roomId} myUserId={userId} role="obs" showControls={false} />
