@@ -1,0 +1,22 @@
+[
+  "Kühn (+Vert -Angr)",
+  "Mäßig (+SpezAngr -Angr)",
+  "Still (+SpezVert -Angr)",
+  "Scheu (+Init -Angr)",
+  "Solo (+Angr -Vert)",
+  "Mild (+SpezAngr -Vert)",
+  "Zart (+SpezVert -Vert)",
+  "Hastig (+Init -Vert)",
+  "Hart (+Angr -SpezAngr)",
+  "Pfiffig (+Vert -SpezAngr)",
+  "Sacht (+SpezVert -SpezAngr)",
+  "Froh (+Init -SpezAngr)",
+  "Frech (+Angr -SpezVert)",
+  "Lasch (+Vert -SpezVert)",
+  "Hitzig (+SpezAngr -SpezVert)",
+  "Naiv (+Init -SpezVert)",
+  "Mutig (+Angr -Init)",
+  "Locker (+Vert -Init)",
+  "Ruhig (+SpezAngr -Init)",
+  "Forsch (+SpezVert -Init)"
+]
