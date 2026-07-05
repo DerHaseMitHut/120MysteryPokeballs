@@ -72,7 +72,16 @@ export function ObsViewPage() {
   if (!claimed) return <p className="text-center text-neutral-400 py-10">Verbinde…</p>
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div
+      style={{
+        width: '100vw',
+        height: '100vh',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       {/* "zoom" statt "transform: scale(...)": transform skaliert eine bereits gerenderte Bitmap
           (unscharfe Kanten/Text beim Verkleinern), zoom layoutet/rendert nativ in Zielgroesse neu
           und bleibt dadurch scharf. In Chromium/CEF unterstuetzt — deckt sowohl OBS als auch
