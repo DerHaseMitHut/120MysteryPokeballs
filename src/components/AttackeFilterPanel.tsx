@@ -47,7 +47,7 @@ function DualRangeSlider({ label, min, max, minValue, maxValue, onChangeMin, onC
           step={step}
           value={minValue}
           onChange={(e) => onChangeMin(Math.min(Number(e.target.value), maxValue))}
-          className="dual-range-input absolute inset-x-0 w-full accent-red-500"
+          className="dual-range-input"
           style={{ zIndex: minValue >= maxValue ? 4 : 3 }}
         />
         <input
@@ -57,7 +57,7 @@ function DualRangeSlider({ label, min, max, minValue, maxValue, onChangeMin, onC
           step={step}
           value={maxValue}
           onChange={(e) => onChangeMax(Math.max(Number(e.target.value), minValue))}
-          className="dual-range-input absolute inset-x-0 w-full accent-red-500"
+          className="dual-range-input"
           style={{ zIndex: 3 }}
         />
       </div>

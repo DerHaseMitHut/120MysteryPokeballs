@@ -28,6 +28,7 @@ interface PeerEntry {
   polite: boolean
   makingOffer: boolean
   ignoreOffer: boolean
+  negotiationPending: boolean
   restartAttempts: number
 }
 
@@ -58,6 +59,10 @@ export function useWebRTCMesh(
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
   const restartTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  // Wird von der Signalisierungs-Effekt-Instanz befuellt, damit der (separate) Kamera-Sync-Effekt
+  // unten bei einem Kamera-An/Aus bestehende Verbindungen aktiv nachverhandeln kann, ohne dass
+  // beide Effekte an dieselben Deps gebunden sein muessen (siehe Kommentar dort).
+  const syncLocalTrackRef = useRef<(stream: MediaStream | null) => void>(() => {})
 
   useEffect(() => {
     if (receiveOnly || !camEnabled) {
@@ -86,25 +91,12 @@ export function useWebRTCMesh(
   // Speist den lokalen Kamera-Track in bereits bestehende Peer-Verbindungen ein, OHNE sie
   // abzureissen. Frueher hing der komplette Signalisierungs-Effekt (unten) an `localStream`,
   // wodurch bei JEDEM Kamera-An/Aus alle Verbindungen geschlossen und neu aufgebaut wurden --
-  // sichtbar als kurzer Blackscreen bei ALLEN Teilnehmern, nicht nur bei der schaltenden Person,
-  // und Quelle diverser Race-Conditions beim Wiederverbinden. Stattdessen wird hier nur der
-  // Video-Track ausgetauscht; die Richtungsaenderung (recvonly <-> sendrecv) loest automatisch
-  // eine "negotiationneeded"-Renegotiation ueber den Signalkanal aus, den Rest erledigt der
-  // Perfect-Negotiation-Handler unten.
+  // sichtbar als kurzer Blackscreen bei ALLEN Teilnehmern, nicht nur bei der schaltenden Person.
+  // Delegiert die eigentliche Track-/Renegotiation-Arbeit an `syncLocalTrackRef.current`, die vom
+  // Signalisierungs-Effekt gesetzt wird (dort leben `send`/Kollisions-Handling).
   useEffect(() => {
     localStreamRef.current = localStream
-    const newTrack = localStream?.getVideoTracks()[0] ?? null
-    for (const entry of peersRef.current.values()) {
-      const [transceiver] = entry.connection.getTransceivers()
-      if (!transceiver) {
-        if (newTrack && localStream) entry.connection.addTrack(newTrack, localStream)
-        continue
-      }
-      transceiver.direction = newTrack ? 'sendrecv' : 'recvonly'
-      if (transceiver.sender.track !== newTrack) {
-        transceiver.sender.replaceTrack(newTrack).catch((err) => console.error('Kamera-Track tauschen fehlgeschlagen', err))
-      }
-    }
+    syncLocalTrackRef.current(localStream)
   }, [localStream])
 
   useEffect(() => {
@@ -129,6 +121,35 @@ export function useWebRTCMesh(
       channel.send({ type: 'broadcast', event: 'rtc-signal', payload: signal })
     }
 
+    // Einzige Stelle, die tatsaechlich ein Offer verschickt -- fuer die Erstverbindung, nach
+    // Kamera-An/Aus UND fuer ICE-Restarts. Bewusst NICHT ueber das browsereigene
+    // "negotiationneeded"-Event ausgeloest: das feuert bei einer reinen Transceiver-Richtungs-
+    // aenderung (recvonly -> sendrecv, ohne neuen Track) nicht in allen Browsern zuverlaessig/
+    // zeitnah genug, was genau dazu fuehrte, dass ein NACHTRAEGLICH aktiviertes Kamerabild bei
+    // bereits verbundenen Gegenstellen nie ankam (nur der "Kamera war beim Verbinden schon an"-
+    // Fall hat zuverlaessig funktioniert). Stattdessen wird hier an jeder Stelle, die den lokalen
+    // Verhandlungsstand aendert, explizit und deterministisch negotiate() aufgerufen.
+    async function negotiate(otherId: string, entry: PeerEntry, opts?: { iceRestart?: boolean }) {
+      if (entry.makingOffer || entry.connection.signalingState !== 'stable') {
+        entry.negotiationPending = true
+        return
+      }
+      entry.makingOffer = true
+      try {
+        const offer = await entry.connection.createOffer(opts?.iceRestart ? { iceRestart: true } : undefined)
+        await entry.connection.setLocalDescription(offer)
+        send({ kind: 'offer', from: myPeerId!, to: otherId, sdp: entry.connection.localDescription!.sdp! })
+      } catch (err) {
+        console.error('RTC-Offer Fehler', err)
+      } finally {
+        entry.makingOffer = false
+        if (entry.negotiationPending) {
+          entry.negotiationPending = false
+          negotiate(otherId, entry)
+        }
+      }
+    }
+
     function getOrCreatePeer(otherId: string): PeerEntry {
       const existing = peersRef.current.get(otherId)
       if (existing) return existing
@@ -147,6 +168,7 @@ export function useWebRTCMesh(
         polite: myPeerId! > otherId,
         makingOffer: false,
         ignoreOffer: false,
+        negotiationPending: false,
         restartAttempts: 0,
       }
       peersRef.current.set(otherId, entry)
@@ -163,20 +185,11 @@ export function useWebRTCMesh(
         }
       }
 
-      // Einzige Stelle, die Offers verschickt -- egal ob Erstverbindung, Kamera-An/Aus oder
-      // ICE-Restart. Der Browser feuert dieses Event automatisch bei jeder Aenderung, die eine
-      // Neuaushandlung braucht (neuer Track, geaenderte Transceiver-Richtung, restartIce()).
-      connection.onnegotiationneeded = async () => {
-        try {
-          entry.makingOffer = true
-          const offer = await connection.createOffer()
-          await connection.setLocalDescription(offer)
-          send({ kind: 'offer', from: myPeerId!, to: otherId, sdp: connection.localDescription!.sdp! })
-        } catch (err) {
-          console.error('RTC-Offer Fehler', err)
-        } finally {
-          entry.makingOffer = false
-        }
+      // Sicherheitsnetz zusaetzlich zu den expliziten negotiate()-Aufrufen -- schadet nicht
+      // (negotiate() ist gegen doppelte/parallele Ausfuehrung abgesichert), faengt aber jeden
+      // Aenderungspfad ab, den wir nicht explizit bedacht haben.
+      connection.onnegotiationneeded = () => {
+        negotiate(otherId, entry)
       }
 
       connection.onconnectionstatechange = () => {
@@ -196,7 +209,20 @@ export function useWebRTCMesh(
         }
       }
 
+      // Legt nur die Verbindung + den lokalen Transceiver an, verschickt aber bewusst noch KEIN
+      // Offer -- das entscheidet der jeweilige Aufrufer (siehe handlePresenceSync/scheduleRestart
+      // vs. handleSignal's Offer-Zweig, der dieselbe Funktion nutzt, um beim Empfang eines
+      // fremden Offers erst die eigene Verbindung samt lokalem Track bereitzustellen, OHNE
+      // gleichzeitig selbst ein konkurrierendes Offer loszuschicken).
       return entry
+    }
+
+    // Aktiv eine neue Verbindung anbieten (Erstkontakt oder Neuaufbau nach gescheitertem
+    // Reconnect) -- getrennt von getOrCreatePeer(), damit das Erzeugen der Verbindung (auch beim
+    // Beantworten eines fremden Offers noetig) nicht automatisch immer ein eigenes Offer ausloest.
+    function offerTo(otherId: string) {
+      const entry = getOrCreatePeer(otherId)
+      negotiate(otherId, entry)
     }
 
     // Verbindungsabbrueche wurden bisher sofort final aufgegeben (Verbindung geschlossen, Tile
@@ -214,16 +240,12 @@ export function useWebRTCMesh(
         if (state === 'connected' || state === 'closed') return
         if (entry.restartAttempts < ICE_RESTART_MAX_ATTEMPTS) {
           entry.restartAttempts += 1
-          try {
-            current.connection.restartIce()
-          } catch (err) {
-            console.error('ICE-Restart Fehler', err)
-          }
+          negotiate(otherId, entry, { iceRestart: true })
           scheduleRestart(otherId, entry, ICE_RESTART_BACKOFF_MS)
         } else {
           teardownPeer(otherId)
           if (myPeerId! < otherId) {
-            getOrCreatePeer(otherId)
+            offerTo(otherId)
           }
         }
       }, delayMs)
@@ -249,7 +271,14 @@ export function useWebRTCMesh(
 
     async function handleSignal(signal: RtcSignal) {
       if (signal.to !== myPeerId) return
-      const entry = getOrCreatePeer(signal.from)
+
+      // Nur ein eingehendes Offer darf eine noch fehlende Verbindung ueberhaupt erst anlegen (samt
+      // unserem lokalen Track/Transceiver, den die Antwort gleich mit einschliessen muss). Ein
+      // Answer oder ICE-Candidate fuer eine Verbindung, die wir gar nicht kennen, kann nur verspaetet
+      // eingetroffen/veraltet sein (die Gegenstelle hat inzwischen selbst schon aufgegeben) -- ein
+      // Anlegen wuerde dort faelschlich ein eigenes, ungewolltes Offer auslösen.
+      const entry = signal.kind === 'offer' ? getOrCreatePeer(signal.from) : peersRef.current.get(signal.from)
+      if (!entry) return
       const connection = entry.connection
 
       if (signal.kind === 'offer') {
@@ -281,6 +310,13 @@ export function useWebRTCMesh(
           pendingCandidatesRef.current.set(signal.from, queue)
         }
       }
+
+      // Nach jeder abgeschlossenen Verhandlungsrunde: falls waehrenddessen eine weitere lokale
+      // Aenderung (z.B. Kamera-Toggle) auflief und deshalb zurueckgestellt wurde, jetzt nachholen.
+      if (connection.signalingState === 'stable' && entry.negotiationPending) {
+        entry.negotiationPending = false
+        negotiate(signal.from, entry)
+      }
     }
 
     async function flushPendingCandidates(otherId: string, entry: PeerEntry) {
@@ -307,7 +343,7 @@ export function useWebRTCMesh(
         const otherId = entry?.peerId
         if (!otherId || otherId === myPeerId || peersRef.current.has(otherId)) continue
         if (myPeerId! < otherId) {
-          getOrCreatePeer(otherId)
+          offerTo(otherId)
         }
       }
     }
@@ -328,7 +364,28 @@ export function useWebRTCMesh(
         }
       })
 
+    syncLocalTrackRef.current = (stream: MediaStream | null) => {
+      const newTrack = stream?.getVideoTracks()[0] ?? null
+      for (const [otherId, entry] of peersRef.current) {
+        const [transceiver] = entry.connection.getTransceivers()
+        if (!transceiver) {
+          if (newTrack && stream) entry.connection.addTrack(newTrack, stream)
+          continue
+        }
+        const directionChanged = transceiver.direction !== (newTrack ? 'sendrecv' : 'recvonly')
+        transceiver.direction = newTrack ? 'sendrecv' : 'recvonly'
+        if (transceiver.sender.track !== newTrack) {
+          transceiver.sender.replaceTrack(newTrack).catch((err) => console.error('Kamera-Track tauschen fehlgeschlagen', err))
+        }
+        if (directionChanged) negotiate(otherId, entry)
+      }
+    }
+    // Kamera koennte schon aktiviert worden sein, bevor dieser Effekt (neu) lief (z.B. Rejoin) --
+    // einmal direkt synchronisieren statt auf die naechste `localStream`-Aenderung zu warten.
+    syncLocalTrackRef.current(localStreamRef.current)
+
     return () => {
+      syncLocalTrackRef.current = () => {}
       for (const timer of restartTimersRef.current.values()) clearTimeout(timer)
       restartTimersRef.current.clear()
       for (const id of Array.from(peersRef.current.keys())) teardownPeer(id)

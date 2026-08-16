@@ -71,17 +71,49 @@ body {
 
 /* Doppel-Regler (Min+Max auf einer Leiste): zwei uebereinandergelegte <input type="range">,
    deren Spur transparent/klickunempfindlich ist -- nur die beiden Griffe selbst reagieren auf
-   Maus/Touch, damit man sie unabhaengig voneinander verschieben kann. */
+   Maus/Touch, damit man sie unabhaengig voneinander verschieben kann. Die eigentliche farbige
+   Markierung des ausgewaehlten Bereichs kommt NICHT von den Inputs selbst (Browser zeichnen bei
+   type="range" per accent-color sonst zusaetzlich eine eigene, undurchsichtige Fuellung von 0 bis
+   zum jeweiligen Thumb -- bei zwei uebereinandergelegten Reglern wuerde die vom oberen Input
+   staendig die eigentlich gewuenschte Min-bis-Max-Markierung darunter verdecken), sondern von
+   einem separaten, per JS positionierten div dahinter. Track UND native Fuellung werden hier
+   deshalb komplett unsichtbar gemacht, nur der Thumb wird eigenstaendig eingefaerbt.
+*/
 .dual-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   pointer-events: none;
   background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.dual-range-input::-webkit-slider-runnable-track {
+  background: transparent;
+  -webkit-appearance: none;
 }
 .dual-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
   pointer-events: auto;
-}
-.dual-range-input::-moz-range-thumb {
-  pointer-events: auto;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: #ef4444;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
 .dual-range-input::-moz-range-track {
   background: transparent;
+}
+.dual-range-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: #ef4444;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
