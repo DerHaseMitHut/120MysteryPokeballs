@@ -121,6 +121,36 @@ export function PokemonFilterPanel({ value, onChange }: Props) {
           </div>
         </div>
         <div>
+          <div className="text-xs font-semibold text-neutral-400 mb-1">Ultrabestien</div>
+          <div className="flex gap-1.5">
+            {TRI_STATE_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => onChange({ ...value, ultraBeast: o.value })}
+                className={chipClass(value.ultraBeast === o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-neutral-400 mb-1">Überparadox</div>
+          <div className="flex gap-1.5">
+            {TRI_STATE_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => onChange({ ...value, superParadox: o.value })}
+                className={chipClass(value.superParadox === o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
           <div className="text-xs font-semibold text-neutral-400 mb-1">Statuswerte-Summe (BST)</div>
           <div className="flex items-center gap-1.5">
             <input
@@ -145,6 +175,8 @@ export function PokemonFilterPanel({ value, onChange }: Props) {
           value.stages.length > 0 ||
           value.legendary !== 'include' ||
           value.mythical !== 'include' ||
+          value.ultraBeast !== 'include' ||
+          value.superParadox !== 'include' ||
           value.bstMin != null ||
           value.bstMax != null) && (
           <button

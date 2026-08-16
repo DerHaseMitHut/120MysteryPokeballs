@@ -38,7 +38,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
 
   const mySeat: Seat | null = role === 1 || role === 2 ? role : null
 
-  const { localStream, remoteStreams, camError } = useWebRTCMesh(roomId, myUserId, camEnabled, {
+  const { localStream, remoteStreams, peerStatuses, camError } = useWebRTCMesh(roomId, myUserId, camEnabled, {
     receiveOnly: role === 'obs',
   })
 
@@ -48,14 +48,20 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const tiles: CamTile[] = useMemo(() => {
     function tileFor(key: string, label: string, ownerUserId: string | null | undefined): CamTile {
       const isLocal = role !== 'obs' && ownerUserId === myUserId
-      return { key, label, isLocal, stream: isLocal ? localStream : ownerUserId ? remoteStreams.get(ownerUserId) ?? null : null }
+      return {
+        key,
+        label,
+        isLocal,
+        stream: isLocal ? localStream : ownerUserId ? remoteStreams.get(ownerUserId) ?? null : null,
+        status: !isLocal && ownerUserId ? peerStatuses.get(ownerUserId) : undefined,
+      }
     }
     return [
       tileFor('seat1', seat1?.display_name || 'Teilnehmer 1', seat1?.user_id),
       tileFor('host', room?.host_display_name || 'Host', room?.host_user_id),
       tileFor('seat2', seat2?.display_name || 'Teilnehmer 2', seat2?.user_id),
     ]
-  }, [seat1, seat2, room, localStream, remoteStreams, myUserId, role])
+  }, [seat1, seat2, room, localStream, remoteStreams, peerStatuses, myUserId, role])
 
   const pendingBall = useMemo(() => {
     for (const ball of balls.values()) {

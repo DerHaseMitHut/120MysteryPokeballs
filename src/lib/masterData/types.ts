@@ -27,6 +27,12 @@ export interface PokemonMasterEntry {
   legendary: boolean
   mythical: boolean
   baby: boolean
+  // Eigene Balance-Kategorien (unabhaengig von legendary/mythical): Ultrabestien (Dex 793-799 +
+  // 803-806) und die als zu stark eingestuften Gen-9-"Ueberparadox"-Pokemon (z.B. Eisenhaupt),
+  // damit der Host sie gezielt aus dem Pool ausschliessen kann, ohne echte Legendaere/Mystische
+  // mit auszuschliessen.
+  ultraBeast: boolean
+  superParadox: boolean
   bst: number
   // Alternative Kampfformen mit eigenen Werten/Typ (z.B. Deoxys, Rotom, Kyurem) inkl. Basisform
   // an Index 0 -- beim Ziehen in den Pool wird zufaellig genau eine davon gewaehlt. Enthaelt bei

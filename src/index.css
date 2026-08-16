@@ -68,3 +68,20 @@ body {
 .slot-flash {
   animation: slot-flash 0.9s ease-out;
 }
+
+/* Doppel-Regler (Min+Max auf einer Leiste): zwei uebereinandergelegte <input type="range">,
+   deren Spur transparent/klickunempfindlich ist -- nur die beiden Griffe selbst reagieren auf
+   Maus/Touch, damit man sie unabhaengig voneinander verschieben kann. */
+.dual-range-input {
+  pointer-events: none;
+  background: transparent;
+}
+.dual-range-input::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+.dual-range-input::-moz-range-thumb {
+  pointer-events: auto;
+}
+.dual-range-input::-moz-range-track {
+  background: transparent;
+}

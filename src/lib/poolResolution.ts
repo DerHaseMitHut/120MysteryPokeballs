@@ -9,6 +9,8 @@ export interface PokemonFilters {
   stages: EvolutionStage[]
   legendary: 'include' | 'exclude' | 'only'
   mythical: 'include' | 'exclude' | 'only'
+  ultraBeast: 'include' | 'exclude' | 'only'
+  superParadox: 'include' | 'exclude' | 'only'
   bstMin: number | null
   bstMax: number | null
 }
@@ -19,19 +21,25 @@ export const EMPTY_POKEMON_FILTERS: PokemonFilters = {
   stages: [],
   legendary: 'include',
   mythical: 'include',
+  ultraBeast: 'include',
+  superParadox: 'include',
   bstMin: null,
   bstMax: null,
 }
 
 export interface AttackeFilters {
   minStatusPercent: number // 0-100: Mindestanteil Status-Attacken im resultierenden Pool
+  maxStatusPercent: number // 0-100: Maximalanteil Status-Attacken im resultierenden Pool
   minPowerPercent: number // 0-100: Mindestanteil Attacken mit Basiswert >= powerThreshold
-  powerThreshold: number // Basiswert-Schwelle, die minPowerPercent zugrunde liegt
+  maxPowerPercent: number // 0-100: Maximalanteil Attacken mit Basiswert >= powerThreshold
+  powerThreshold: number // Basiswert-Schwelle, die min-/maxPowerPercent zugrunde liegt
 }
 
 export const DEFAULT_ATTACKE_FILTERS: AttackeFilters = {
   minStatusPercent: 0,
+  maxStatusPercent: 100,
   minPowerPercent: 0,
+  maxPowerPercent: 100,
   powerThreshold: 80,
 }
 
@@ -64,6 +72,10 @@ export function applyPokemonFilters(entries: PokemonMasterEntry[], f: PokemonFil
     if (f.legendary === 'only' && !e.legendary) return false
     if (f.mythical === 'exclude' && e.mythical) return false
     if (f.mythical === 'only' && !e.mythical) return false
+    if (f.ultraBeast === 'exclude' && e.ultraBeast) return false
+    if (f.ultraBeast === 'only' && !e.ultraBeast) return false
+    if (f.superParadox === 'exclude' && e.superParadox) return false
+    if (f.superParadox === 'only' && !e.superParadox) return false
     if (f.bstMin != null && e.bst < f.bstMin) return false
     if (f.bstMax != null && e.bst > f.bstMax) return false
     return true
@@ -104,9 +116,12 @@ function isHighPower(m: AttackeMasterEntry, threshold: number): boolean {
 }
 
 // Attacken-Aufloesung mit Kompositions-Garantien: manuell angehakte Attacken zaehlen auf die
-// Status-/Basiswert-Mindestquoten an; der Rest wird zufaellig aufgefuellt, wobei zuerst die
-// beiden Quoten bedient werden (Status-Attacken haben nie einen Basiswert, die Mengen
-// ueberschneiden sich also nie) und danach frei aus dem verbleibenden Pool gezogen wird.
+// Status-/Basiswert-Quoten an; der Rest wird zufaellig aufgefuellt, wobei zuerst die beiden
+// Mindestquoten bedient werden (Status-Attacken haben nie einen Basiswert, die Mengen
+// ueberschneiden sich also nie) und danach frei aus dem verbleibenden Pool gezogen wird. Die
+// Maximalquoten werden durchgesetzt, indem der freie Auffuell-Pool von vornherein nur so viele
+// zusaetzliche Status-/Basiswert-Attacken enthaelt, wie bis zum jeweiligen Maximum noch erlaubt
+// sind -- so kann ein zufaelliger Zug das Maximum nie versehentlich ueberschreiten.
 function resolveAttackePool(config: CategoryConfig): string[] {
   const filters = config.attackeFilters ?? DEFAULT_ATTACKE_FILTERS
   const manualNames = new Set(config.manualSelection)
@@ -114,7 +129,9 @@ function resolveAttackePool(config: CategoryConfig): string[] {
   let pool = ATTACKEN_MASTER.filter((m) => !manualNames.has(m.name))
 
   const minStatusCount = Math.ceil((filters.minStatusPercent / 100) * config.count)
+  const maxStatusCount = Math.floor((filters.maxStatusPercent / 100) * config.count)
   const minPowerCount = Math.ceil((filters.minPowerPercent / 100) * config.count)
+  const maxPowerCount = Math.floor((filters.maxPowerPercent / 100) * config.count)
 
   const selected = [...manualEntries]
   const statusSoFar = selected.filter((m) => m.category === 'status').length
@@ -137,7 +154,22 @@ function resolveAttackePool(config: CategoryConfig): string[] {
   pool = pool.filter((m) => !drawnPower.includes(m))
 
   const stillNeeded = Math.max(0, config.count - selected.length)
-  selected.push(...pickRandom(pool, stillNeeded))
+  const statusTotalSoFar = statusSoFar + drawnStatus.length
+  const powerTotalSoFar = powerSoFar + drawnPower.length
+  const additionalStatusAllowed = Math.max(0, maxStatusCount - statusTotalSoFar)
+  const additionalPowerAllowed = Math.max(0, maxPowerCount - powerTotalSoFar)
+
+  const otherPool = pool.filter((m) => m.category !== 'status' && !isHighPower(m, filters.powerThreshold))
+  const eligibleStatus = pickRandom(
+    pool.filter((m) => m.category === 'status'),
+    additionalStatusAllowed,
+  )
+  const eligiblePower = pickRandom(
+    pool.filter((m) => isHighPower(m, filters.powerThreshold)),
+    additionalPowerAllowed,
+  )
+  const fillerPool = [...otherPool, ...eligibleStatus, ...eligiblePower]
+  selected.push(...pickRandom(fillerPool, stillNeeded))
 
   return selected.map((m) => m.name)
 }
@@ -205,7 +237,15 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       }
       const filters = cfg.attackeFilters ?? DEFAULT_ATTACKE_FILTERS
       const minStatusCount = Math.ceil((filters.minStatusPercent / 100) * cfg.count)
+      const maxStatusCount = Math.floor((filters.maxStatusPercent / 100) * cfg.count)
       const minPowerCount = Math.ceil((filters.minPowerPercent / 100) * cfg.count)
+      const maxPowerCount = Math.floor((filters.maxPowerPercent / 100) * cfg.count)
+      if (filters.minStatusPercent > filters.maxStatusPercent) {
+        errors.push(`${label}: Mindestanteil Status-Attacken groesser als der Maximalanteil`)
+      }
+      if (filters.minPowerPercent > filters.maxPowerPercent) {
+        errors.push(`${label}: Mindestanteil starker Attacken groesser als der Maximalanteil`)
+      }
       if (minStatusCount + minPowerCount > cfg.count) {
         errors.push(`${label}: Status- und Basiswert-Mindestanteil zusammen groesser als die Gesamtanzahl`)
       }
@@ -216,6 +256,18 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       const powerAvailable = ATTACKEN_MASTER.filter((m) => isHighPower(m, filters.powerThreshold)).length
       if (powerAvailable < minPowerCount) {
         errors.push(`${label}: nur ${powerAvailable} Attacken mit Basiswert >= ${filters.powerThreshold} verfuegbar, aber ${minPowerCount} gefordert`)
+      }
+      const manualStatusCount = ATTACKEN_MASTER.filter(
+        (m) => cfg.manualSelection.includes(m.name) && m.category === 'status',
+      ).length
+      if (manualStatusCount > maxStatusCount) {
+        errors.push(`${label}: ${manualStatusCount} manuell angehakte Status-Attacken ueberschreiten den Maximalanteil (${maxStatusCount})`)
+      }
+      const manualPowerCount = ATTACKEN_MASTER.filter(
+        (m) => cfg.manualSelection.includes(m.name) && isHighPower(m, filters.powerThreshold),
+      ).length
+      if (manualPowerCount > maxPowerCount) {
+        errors.push(`${label}: ${manualPowerCount} manuell angehakte starke Attacken ueberschreiten den Maximalanteil (${maxPowerCount})`)
       }
       continue
     }

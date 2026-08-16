@@ -1,10 +1,24 @@
 import { useEffect, useRef } from 'react'
+import type { PeerStatus } from '../hooks/useWebRTCMesh'
 
 export interface CamTile {
   key: string
   label: string
   stream: MediaStream | null
   isLocal?: boolean
+  status?: PeerStatus
+}
+
+const STATUS_LABEL: Record<PeerStatus, string> = {
+  connecting: 'Verbindet…',
+  connected: 'Kamera aus',
+  reconnecting: 'Verbindung wird wiederhergestellt…',
+}
+
+function placeholderText(tile: CamTile): string {
+  if (tile.isLocal) return 'Keine Kamera'
+  if (!tile.status) return 'Keine Kamera'
+  return STATUS_LABEL[tile.status]
 }
 
 function VideoTile({ tile }: { tile: CamTile }) {
@@ -19,7 +33,9 @@ function VideoTile({ tile }: { tile: CamTile }) {
       {tile.stream ? (
         <video ref={ref} autoPlay playsInline muted={tile.isLocal} className="h-full w-full object-cover" />
       ) : (
-        <span className="text-neutral-600 text-sm">Keine Kamera</span>
+        <span className={`text-sm ${tile.status === 'reconnecting' ? 'text-amber-400' : 'text-neutral-600'}`}>
+          {placeholderText(tile)}
+        </span>
       )}
       <span className="absolute bottom-1.5 left-2 rounded bg-black/70 backdrop-blur-sm px-2 py-0.5 text-xs font-medium text-white">
         {tile.label}
