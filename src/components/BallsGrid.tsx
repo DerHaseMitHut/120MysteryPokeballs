@@ -69,6 +69,12 @@ export function BallsGrid({
 
   const highlighted = search ? Number(search) : null
 
+  function handleRandomDraw() {
+    const unopened = numbers.filter((n) => !balls.get(n)?.opened)
+    if (unopened.length === 0) return
+    onDraw(unopened[Math.floor(Math.random() * unopened.length)])
+  }
+
   useEffect(() => {
     if (highlighted && highlighted >= 1 && highlighted <= totalBalls) {
       setPage(Math.floor((highlighted - 1) / PER_PAGE))
@@ -151,15 +157,27 @@ export function BallsGrid({
             {openedCount}/{totalBalls} geöffnet
           </span>
         </div>
-        <input
-          type="number"
-          min={1}
-          max={totalBalls}
-          placeholder="Nr. suchen"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-24 rounded-md bg-neutral-950/60 border border-white/10 focus:border-red-500/50 focus:outline-none px-2 py-1 text-sm text-white placeholder:text-neutral-500 transition-colors"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!canDraw}
+            onClick={handleRandomDraw}
+            title={canDraw ? 'Zufälligen (noch geschlossenen) Ball öffnen' : 'Nur am Zug wählbar'}
+            className={`rounded-md border border-red-500/60 bg-neutral-900 px-2.5 py-1 text-sm text-neutral-200 transition
+              ${canDraw ? 'hover:bg-neutral-800 cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
+          >
+            🎲 Zufällig öffnen
+          </button>
+          <input
+            type="number"
+            min={1}
+            max={totalBalls}
+            placeholder="Nr. suchen"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-24 rounded-md bg-neutral-950/60 border border-white/10 focus:border-red-500/50 focus:outline-none px-2 py-1 text-sm text-white placeholder:text-neutral-500 transition-colors"
+          />
+        </div>
       </div>
 
       {/* Feste 5:4-Flaeche (5 Spalten x 4 Reihen quadratischer Zellen), damit das Reveal-Overlay
