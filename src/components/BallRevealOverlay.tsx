@@ -9,6 +9,8 @@ interface Props {
   openerName: string
   onRevealed?: () => void
   sfxVolume: number
+  canVeto?: boolean
+  onVeto?: () => void
 }
 
 const VIDEO_SRC = '/pokeball-animation.mp4'
@@ -75,7 +77,7 @@ function playAudioCue(
 // ausgelesen, nicht hart codiert, damit ein spaeteres Austauschen der Datei einfach bleibt.
 // Start ist an ball.opened_at (Server-Zeit) gekoppelt, nicht an den lokalen Mount-Zeitpunkt, damit
 // die Animation bei allen Teilnehmern synchron laeuft statt je nach Netzwerk-Latenz versetzt.
-export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVolume }: Props) {
+export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVolume, canVeto, onVeto }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [grown, setGrown] = useState(false)
   const [revealing, setRevealing] = useState(false)
@@ -220,7 +222,18 @@ export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVol
           {known ? ball.value : 'zensiert'}
         </span>
         {isMine ? (
-          <span className="text-base text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
+          <>
+            <span className="text-base text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
+            {canVeto && (
+              <button
+                type="button"
+                onClick={onVeto}
+                className="mt-1 rounded-lg border border-pink-400/60 bg-pink-400/10 hover:bg-pink-400/20 px-3.5 py-1.5 text-sm text-pink-300 transition"
+              >
+                🚫 Veto-Joker einsetzen (Ball verwerfen)
+              </button>
+            )}
+          </>
         ) : (
           <span className="text-sm text-neutral-500 mt-1">wird gerade platziert…</span>
         )}

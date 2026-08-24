@@ -1,3 +1,6 @@
+import type { JokerConfig, JokerType } from './jokers'
+import type { PokemonFilters } from './poolResolution'
+
 export type Category = 'pokemon' | 'item' | 'wesen' | 'faehigkeit' | 'attacke'
 export type RoomStatus = 'setup' | 'drafting' | 'finished'
 export type Seat = 1 | 2
@@ -11,6 +14,8 @@ export interface RoomRow {
   status: RoomStatus
   current_turn_seat: Seat | null
   overlay_mode: boolean
+  joker_config: JokerConfig
+  pokemon_filters: PokemonFilters | null
   created_at: string
 }
 
@@ -62,6 +67,8 @@ export interface BallRow {
   placed_field: number | null
   placed_slot_type: Category | null
   placed_slot_ordinal: number | null
+  discarded: boolean
+  discarded_at: string | null
 }
 
 
@@ -69,6 +76,19 @@ export interface BallContentRow {
   ball_id: string
   room_id: string
   value: string
+  joker_type: JokerType | null
+}
+
+export interface PlayerJokerRow {
+  id: string
+  room_id: string
+  seat: Seat
+  joker_type: JokerType
+  source_ball_id: string | null
+  granted_at: string
+  used: boolean
+  used_at: string | null
+  used_detail: Record<string, unknown> | null
 }
 
 export interface TeamSlotRow {
@@ -86,10 +106,12 @@ export interface DraftLogRow {
   room_id: string
   seat: Seat
   ball_id: string
-  field_index: number
-  slot_type: Category
-  slot_ordinal: number
+  field_index: number | null
+  slot_type: Category | null
+  slot_ordinal: number | null
   overwritten_ball_id: string | null
+  action_type: 'place' | 'veto'
+  joker_id: string | null
   created_at: string
 }
 
@@ -105,6 +127,7 @@ export interface Database {
       content_pool: { Row: ContentPoolRow; Insert: Partial<ContentPoolRow>; Update: Partial<ContentPoolRow> }
       balls: { Row: BallRow; Insert: Partial<BallRow>; Update: Partial<BallRow> }
       ball_contents: { Row: BallContentRow; Insert: Partial<BallContentRow>; Update: Partial<BallContentRow> }
+      player_jokers: { Row: PlayerJokerRow; Insert: Partial<PlayerJokerRow>; Update: Partial<PlayerJokerRow> }
       team_slots: { Row: TeamSlotRow; Insert: Partial<TeamSlotRow>; Update: Partial<TeamSlotRow> }
       draft_log: { Row: DraftLogRow; Insert: Partial<DraftLogRow>; Update: Partial<DraftLogRow> }
       room_obs_viewers: { Row: RoomObsViewerRow; Insert: Partial<RoomObsViewerRow>; Update: Partial<RoomObsViewerRow> }
@@ -112,8 +135,13 @@ export interface Database {
     Views: Record<string, never>
     Functions: {
       create_room: { Args: Record<string, never>; Returns: RoomRow }
+      set_joker_config: { Args: { p_room_id: string; p_config: JokerConfig }; Returns: void }
       set_content_pool: {
-        Args: { p_room_id: string; p_pool: { category: Category; value: string }[] }
+        Args: {
+          p_room_id: string
+          p_pool: { category: Category; value: string }[]
+          p_pokemon_filters?: PokemonFilters | null
+        }
         Returns: void
       }
       preview_room: { Args: { p_code: string }; Returns: PreviewRoomResult }
@@ -131,6 +159,15 @@ export interface Database {
           p_slot_type: Category
           p_slot_ordinal: number
         }
+        Returns: void
+      }
+      use_veto_joker: { Args: { p_room_id: string }; Returns: void }
+      use_wondertrade_joker: {
+        Args: { p_room_id: string; p_target_ball_id: string; p_new_value: string }
+        Returns: void
+      }
+      use_wechsel_joker: {
+        Args: { p_room_id: string; p_slot_a_id: string; p_slot_b_id: string }
         Returns: void
       }
       lock_team: { Args: { p_room_id: string }; Returns: void }

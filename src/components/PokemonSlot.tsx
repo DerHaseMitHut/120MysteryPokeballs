@@ -9,19 +9,23 @@ interface Props {
   ballId?: string | null
   selectable?: boolean
   onSelect?: () => void
+  // 'pink' markiert eine Joker-Zielauswahl (statt der normalen gelben Ball-Platzierung).
+  accent?: 'yellow' | 'pink'
+  // Zusaetzlicher Ring fuer "das ist gerade als erster Slot eines Wechseljoker-Tauschs gewaehlt".
+  selected?: boolean
 }
 
 // Quadratische Box (statt horizontalem Balken): Badge oben, Sprite mittig, Name unten. Wird per
 // h-full so hoch gestreckt wie die daneben gestapelten Wesen/Faehigkeit/Item-Zeilen (siehe FieldCard).
 // min-h-[9rem] sorgt zusaetzlich dafuer, dass dem Sprite auch dann genug Platz bleibt, wenn die
 // Zeilen daneben (noch) niedriger waeren.
-export function PokemonSlot({ value, filled, ballId = null, selectable, onSelect }: Props) {
+export function PokemonSlot({ value, filled, ballId = null, selectable, onSelect, accent = 'yellow', selected }: Props) {
   const [spriteFailed, setSpriteFailed] = useState(false)
   const spriteUrl = filled ? getPokemonSpriteUrl(value) : null
   const flashing = useFlashOnChange(ballId)
 
   const stateClass = selectable
-    ? 'border-yellow-400 bg-neutral-800 hover:bg-neutral-700 cursor-pointer'
+    ? `${accent === 'pink' ? 'border-pink-400' : 'border-yellow-400'} bg-neutral-800 hover:bg-neutral-700 cursor-pointer`
     : filled
       ? `${CATEGORY_FILLED_STYLE.pokemon} cursor-default`
       : 'border-white/10 bg-neutral-900/60 cursor-default'
@@ -31,7 +35,7 @@ export function PokemonSlot({ value, filled, ballId = null, selectable, onSelect
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`h-full w-full min-h-[9rem] rounded-lg border px-2 py-2 flex flex-col items-center gap-1.5 text-center transition ${stateClass} ${flashing ? 'slot-flash' : ''}`}
+      className={`h-full w-full min-h-[9rem] rounded-lg border px-2 py-2 flex flex-col items-center gap-1.5 text-center transition ${stateClass} ${flashing ? 'slot-flash' : ''} ${selected ? 'ring-2 ring-pink-400' : ''}`}
     >
       <span className={`px-1.5 py-0.5 rounded ${CATEGORY_COLORS.pokemon} text-white text-[10px] font-semibold shrink-0`}>
         {CATEGORY_LABELS.pokemon}

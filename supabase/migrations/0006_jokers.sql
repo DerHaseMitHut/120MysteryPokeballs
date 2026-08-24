@@ -1,98 +1,47 @@
--- 120 Pokébälle — vollständiges Datenbankschema
--- Einmal komplett im Supabase SQL-Editor ausführen (Projekt-Dashboard -> SQL Editor -> New query).
--- Voraussetzung: unter Authentication -> Providers -> "Anonymous Sign-Ins" aktivieren.
-
-create extension if not exists pgcrypto;
+-- Fuegt drei Joker-Arten hinzu (Veto/Wondertrade/Wechsel), die zusaetzlich zum Standardinhalt
+-- eines Balls versteckt mitdrin sein koennen. Chance, Gesamt-Obergrenze und je Jokerart
+-- Aktiv/Gewichtung/Obergrenze sind vom Host vor Spielstart einstellbar (siehe HostSetupPanel /
+-- JokerConfigPanel). Einmal im Supabase SQL-Editor ausfuehren.
 
 -- =========================================================================
--- 1. TABELLEN
+-- 1. SCHEMA-AENDERUNGEN
 -- =========================================================================
 
-create table public.rooms (
-  id uuid primary key default gen_random_uuid(),
-  code text not null unique,
-  host_user_id uuid not null,
-  host_display_name text,
-  obs_token text not null default encode(gen_random_bytes(18), 'hex'),
-  status text not null default 'setup' check (status in ('setup', 'drafting', 'finished')),
-  current_turn_seat int check (current_turn_seat in (1, 2)),
-  overlay_mode boolean not null default false,
-  -- Joker-Konfiguration (Chance/Obergrenzen/Gewichtung je Art), vom Host vor Spielstart gesetzt.
-  -- Ueberlebt reset_draft, wie der Content-Pool auch.
-  joker_config jsonb not null default '{
-    "chancePercent": 15,
-    "maxTotal": null,
-    "types": {
-      "veto": { "enabled": true, "weight": 1, "maxCount": null },
-      "wondertrade": { "enabled": true, "weight": 1, "maxCount": null },
-      "wechsel": { "enabled": true, "weight": 1, "maxCount": null }
-    }
-  }'::jsonb,
-  -- Beim Pool-Setup gewaehlte Pokemon-Filter, fuer Wondertrade-Rerolls waehrend des Drafts (siehe
-  -- use_wondertrade_joker weiter unten).
-  pokemon_filters jsonb,
-  created_at timestamptz not null default now()
-);
+-- Der Joker eines Balls wird wie sein Standardinhalt erst beim Oeffnen bekannt -- deshalb in
+-- ball_contents (dieselbe RLS-"reveal rule" wie fuer den Standardwert greift automatisch mit).
+alter table public.ball_contents add column if not exists joker_type text
+  check (joker_type in ('veto', 'wondertrade', 'wechsel'));
 
-create table public.room_participants (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  seat int not null check (seat in (1, 2)),
-  user_id uuid,
-  display_name text,
-  locked boolean not null default false,
-  locked_at timestamptz,
-  unique (room_id, seat)
-);
+-- Joker-Konfiguration (Chance/Obergrenzen/Gewichtung) wird vom Host vor Spielstart festgelegt und
+-- bleibt am Room haengen (uebersteht reset_draft, wie der Content-Pool auch).
+alter table public.rooms add column if not exists joker_config jsonb not null default '{
+  "chancePercent": 15,
+  "maxTotal": null,
+  "types": {
+    "veto": { "enabled": true, "weight": 1, "maxCount": null },
+    "wondertrade": { "enabled": true, "weight": 1, "maxCount": null },
+    "wechsel": { "enabled": true, "weight": 1, "maxCount": null }
+  }
+}'::jsonb;
 
-create table public.room_obs_viewers (
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  user_id uuid not null,
-  created_at timestamptz not null default now(),
-  primary key (room_id, user_id)
-);
+-- Die beim Pool-Setup gewaehlten Pokemon-Filter (Generation/Typ/Legendaer/BST-Bereich/...) werden
+-- zusaetzlich hier gespeichert, damit der Wondertrade-Joker waehrend des laufenden Drafts noch
+-- "gemaess den eingestellten Richtlinien" neu wuerfeln kann -- die Filterlogik selbst lebt nur im
+-- Frontend (Stammdaten sind kein DB-Table), die Auswahl macht deshalb der Client; der Server
+-- validiert beim Anwenden nur, dass der neue Wert nicht mit einem bereits vergebenen oder noch
+-- versteckten Pokemon im Raum kollidiert (siehe use_wondertrade_joker unten).
+alter table public.rooms add column if not exists pokemon_filters jsonb;
 
-create table public.content_pool (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  category text not null check (category in ('pokemon', 'item', 'wesen', 'faehigkeit', 'attacke')),
-  value text not null
-);
-
-create table public.balls (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  number int not null check (number > 0),
-  category text not null check (category in ('pokemon', 'item', 'wesen', 'faehigkeit', 'attacke')),
-  opened boolean not null default false,
-  opened_by_seat int check (opened_by_seat in (1, 2)),
-  opened_at timestamptz,
-  placed_field int check (placed_field between 1 and 4),
-  placed_slot_type text check (placed_slot_type in ('pokemon', 'item', 'wesen', 'faehigkeit', 'attacke')),
-  placed_slot_ordinal int,
-  -- Veto-Joker: Ball wurde geoeffnet, aber bewusst NICHT platziert (statt geschlossen zu bleiben
-  -- oder platziert werden zu muessen).
-  discarded boolean not null default false,
-  discarded_at timestamptz,
-  unique (room_id, number)
-);
-
--- Geheimer Teil: enthaelt die tatsaechlichen Werte. Getrennt von "balls", damit die
--- RLS-Policy (siehe unten) nur DIESE Tabelle je nach Betrachter unterschiedlich filtern muss.
-create table public.ball_contents (
-  ball_id uuid primary key references public.balls(id) on delete cascade,
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  value text not null,
-  -- Optionaler Zusatz-Joker, der zusaetzlich zum Standardinhalt in diesem Ball steckt. Wie der
-  -- Wert selbst erst nach dem Oeffnen sichtbar (gleiche "reveal rule"-Policy unten).
-  joker_type text check (joker_type in ('veto', 'wondertrade', 'wechsel'))
-);
+-- Veto braucht einen Weg, einen geoeffneten Ball als "verworfen" zu markieren, ohne ihn zu
+-- platzieren (bisheriges Schema kannte nur offen/platziert).
+alter table public.balls add column if not exists discarded boolean not null default false;
+alter table public.balls add column if not exists discarded_at timestamptz;
 
 -- Joker-Inventar je Teilnehmer: einzelne Zeilen (nicht nur ein Zaehler), damit sich einzelne
--- Vergaben/Verbrauche fuer Undo nachvollziehen lassen. Bewusst OEFFENTLICH lesbar (jeder soll
--- sehen, wer welchen Joker hat), unabhaengig davon, ob der zugrundeliegende Ball-Wert fuer den
--- Gegner ueberhaupt sichtbar ist.
-create table public.player_jokers (
+-- Vergaben/Verbrauche fuer Undo nachvollziehen lassen. Die Vergabe selbst ist bewusst OEFFENTLICH
+-- lesbar (jeder soll sehen, wer welchen Joker hat) -- unabhaengig davon, ob der zugrundeliegende
+-- Ball-Wert fuer den Gegner ueberhaupt sichtbar ist.
+create table if not exists public.player_jokers (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.rooms(id) on delete cascade,
   seat int not null check (seat in (1, 2)),
@@ -104,167 +53,29 @@ create table public.player_jokers (
   used_detail jsonb
 );
 
-create table public.team_slots (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  seat int not null check (seat in (1, 2)),
-  field_index int not null check (field_index between 1 and 4),
-  slot_type text not null check (slot_type in ('pokemon', 'item', 'wesen', 'faehigkeit', 'attacke')),
-  slot_ordinal int not null default 1,
-  filled_ball_id uuid references public.balls(id),
-  unique (room_id, seat, field_index, slot_type, slot_ordinal)
-);
-
-create table public.draft_log (
-  id bigint generated always as identity primary key,
-  room_id uuid not null references public.rooms(id) on delete cascade,
-  seat int not null,
-  ball_id uuid not null,
-  -- field_index/slot_type/slot_ordinal sind bei einem Veto-Log-Eintrag (siehe action_type) leer,
-  -- da kein Slot involviert ist.
-  field_index int,
-  slot_type text,
-  slot_ordinal int,
-  overwritten_ball_id uuid,
-  action_type text not null default 'place' check (action_type in ('place', 'veto')),
-  joker_id uuid references public.player_jokers(id) on delete set null,
-  created_at timestamptz not null default now()
-);
-
--- =========================================================================
--- 2. HELFERFUNKTIONEN (SECURITY DEFINER, um rekursive RLS-Lookups zu vermeiden)
--- =========================================================================
-
-create or replace function public.is_host(p_room_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from rooms where id = p_room_id and host_user_id = auth.uid());
-$$;
-
-create or replace function public.is_obs_viewer(p_room_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from room_obs_viewers where room_id = p_room_id and user_id = auth.uid()
-  );
-$$;
-
-create or replace function public.my_seat(p_room_id uuid)
-returns int language sql stable security definer set search_path = public as $$
-  select seat from room_participants where room_id = p_room_id and user_id = auth.uid();
-$$;
-
-create or replace function public.is_room_member(p_room_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
-  select public.is_host(p_room_id)
-    or public.is_obs_viewer(p_room_id)
-    or exists (select 1 from room_participants where room_id = p_room_id and user_id = auth.uid());
-$$;
-
--- =========================================================================
--- 3. ROW LEVEL SECURITY
--- =========================================================================
-
-alter table public.rooms enable row level security;
-alter table public.room_participants enable row level security;
-alter table public.room_obs_viewers enable row level security;
-alter table public.content_pool enable row level security;
-alter table public.balls enable row level security;
-alter table public.ball_contents enable row level security;
 alter table public.player_jokers enable row level security;
-alter table public.team_slots enable row level security;
-alter table public.draft_log enable row level security;
 
-create policy "room members can read room" on public.rooms
-  for select using (public.is_room_member(id));
-
-create policy "room members can read participants" on public.room_participants
-  for select using (public.is_room_member(room_id));
-
-create policy "room members can read obs viewers" on public.room_obs_viewers
-  for select using (public.is_room_member(room_id));
-
-create policy "host can read content pool" on public.content_pool
-  for select using (public.is_host(room_id));
-
-create policy "room members can read balls" on public.balls
-  for select using (public.is_room_member(room_id));
-
--- Das Kernstueck: NIEMAND sieht den Wert eines noch nicht geoeffneten Balls (auch nicht
--- Host/OBS). Erst nach dem Oeffnen greift die Sichtbarkeits-Ausnahme: Host/OBS-Betrachter,
--- oder wer den Ball selbst geoeffnet hat, oder Pokemon-Inhalte (nach Oeffnen immer oeffentlich).
-create policy "reveal rule" on public.ball_contents
-  for select using (
-    exists (
-      select 1 from balls b
-      where b.id = ball_contents.ball_id
-        and b.opened = true
-        and (
-          public.is_host(room_id)
-          or public.is_obs_viewer(room_id)
-          or b.category = 'pokemon'
-          or b.opened_by_seat = public.my_seat(room_id)
-        )
-    )
-  );
-
+drop policy if exists "room members can read player jokers" on public.player_jokers;
 create policy "room members can read player jokers" on public.player_jokers
   for select using (public.is_room_member(room_id));
 
-create policy "room members can read team slots" on public.team_slots
-  for select using (public.is_room_member(room_id));
+grant select on public.player_jokers to authenticated;
 
-create policy "room members can read draft log" on public.draft_log
-  for select using (public.is_room_member(room_id));
+-- draft_log muss neben Platzierungen jetzt auch Veto-Einsaetze protokollieren koennen (fuer
+-- undo_last_action). field_index/slot_type/slot_ordinal ergeben bei einem Veto keinen Sinn und
+-- werden deshalb nullable.
+alter table public.draft_log add column if not exists action_type text not null default 'place'
+  check (action_type in ('place', 'veto'));
+alter table public.draft_log add column if not exists joker_id uuid references public.player_jokers(id) on delete set null;
+alter table public.draft_log alter column field_index drop not null;
+alter table public.draft_log alter column slot_type drop not null;
+alter table public.draft_log alter column slot_ordinal drop not null;
 
--- Keine INSERT/UPDATE/DELETE-Policies fuer normale Rollen auf irgendeiner Tabelle:
--- alle Schreibzugriffe laufen ausschliesslich ueber die SECURITY DEFINER RPCs unten,
--- die als Tabellenbesitzer laufen und RLS damit bewusst umgehen (kontrolliert, mit
--- eigener serverseitiger Validierung).
-
--- Grants: RLS schuetzt Zeilen, aber ohne GRANT SELECT gibt es ueberhaupt keinen Zugriff.
-grant select on public.rooms, public.room_participants, public.room_obs_viewers,
-  public.content_pool, public.balls, public.ball_contents, public.player_jokers, public.team_slots,
-  public.draft_log
-  to authenticated;
+alter publication supabase_realtime add table public.player_jokers;
 
 -- =========================================================================
--- 4. RPC-FUNKTIONEN (serverseitige Spiellogik)
+-- 2. RPC-FUNKTIONEN
 -- =========================================================================
-
-create or replace function public.generate_room_code()
-returns text language plpgsql as $$
-declare
-  chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- ohne 0/O/1/I zur besseren Lesbarkeit
-  result text;
-  i int;
-begin
-  loop
-    result := '';
-    for i in 1..6 loop
-      result := result || substr(chars, 1 + floor(random() * length(chars))::int, 1);
-    end loop;
-    exit when not exists (select 1 from rooms where code = result);
-  end loop;
-  return result;
-end;
-$$;
-
--- Erstellt einen leeren Raum sofort (ohne Pool) — der Host landet direkt auf dem Hauptbildschirm
--- (Cams/Baelle/Teams-Layout) und traegt den Pool von dort aus ueber set_content_pool() ein,
--- statt vorher eine separate Eingabemaske ausfuellen zu muessen.
-create or replace function public.create_room()
-returns public.rooms
-language plpgsql security definer set search_path = public as $$
-declare
-  v_room rooms;
-begin
-  insert into rooms (code, host_user_id) values (public.generate_room_code(), auth.uid())
-    returning * into v_room;
-
-  insert into room_participants (room_id, seat) values (v_room.id, 1), (v_room.id, 2);
-
-  return v_room;
-end;
-$$;
 
 -- Speichert die Joker-Konfiguration eines Raums (Host-only, nur waehrend 'setup').
 create or replace function public.set_joker_config(p_room_id uuid, p_config jsonb)
@@ -291,10 +102,9 @@ begin
 end;
 $$;
 
--- Setzt/ersetzt den Pool eines Raums (Groesse vom Host frei konfiguriert), solange dieser noch im
--- Setup ist. Kann beliebig oft aufgerufen werden (z.B. waehrend der Host noch tippt und die
--- Teilnehmer schon warten). Speichert zusaetzlich die aktuellen Pokemon-Filter (fuer spaetere
--- Wondertrade-Reroll-Vorschlaege waehrend des Drafts).
+-- Setzt/ersetzt den Pool eines Raums (wie zuvor) und speichert zusaetzlich die aktuellen
+-- Pokemon-Filter (fuer spaetere Wondertrade-Reroll-Vorschlaege). p_pokemon_filters ist ein neuer,
+-- defaultwertiger Parameter -- bestehende Aufrufe mit nur 2 Argumenten bleiben gueltig.
 create or replace function public.set_content_pool(p_room_id uuid, p_pool jsonb, p_pokemon_filters jsonb default null)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -324,9 +134,6 @@ begin
     into v_count_pokemon, v_count_item, v_count_wesen, v_count_faehigkeit, v_count_attacke, v_total
     from jsonb_array_elements(p_pool) as value;
 
-  -- Keine fixen 120/20/15/15/15/55 mehr: Host konfiguriert Gesamtzahl und Verteilung frei. Die
-  -- Minima 8/8/8/8/32 ergeben sich aus dem unveraenderten Team-Slot-Layout (2 Sitze x 4 Felder x
-  -- je 1 Pokemon/Wesen/Faehigkeit/Item + 4 Attacke) -- ohne sie waeren manche Slots nie befuellbar.
   if v_total < 1 or v_total <> (v_count_pokemon + v_count_item + v_count_wesen + v_count_faehigkeit + v_count_attacke) then
     raise exception 'Ungueltiger Pool';
   end if;
@@ -347,113 +154,9 @@ begin
 end;
 $$;
 
-create or replace function public.preview_room(p_code text)
-returns jsonb
-language plpgsql security definer set search_path = public as $$
-declare
-  v_room rooms;
-  v_result jsonb;
-begin
-  select * into v_room from rooms where code = upper(p_code);
-  if not found then
-    raise exception 'Raum mit diesem Code wurde nicht gefunden';
-  end if;
-
-  select jsonb_build_object(
-    'room_id', v_room.id,
-    'code', v_room.code,
-    'status', v_room.status,
-    'seats', (
-      select jsonb_agg(jsonb_build_object(
-        'seat', rp.seat,
-        'taken', rp.user_id is not null,
-        'display_name', rp.display_name,
-        'is_me', rp.user_id = auth.uid()
-      ) order by rp.seat)
-      from room_participants rp where rp.room_id = v_room.id
-    )
-  ) into v_result;
-
-  return v_result;
-end;
-$$;
-
-create or replace function public.join_room(p_code text, p_seat int, p_display_name text)
-returns public.room_participants
-language plpgsql security definer set search_path = public as $$
-declare
-  v_room rooms;
-  v_participant room_participants;
-begin
-  select * into v_room from rooms where code = upper(p_code);
-  if not found then
-    raise exception 'Raum mit diesem Code wurde nicht gefunden';
-  end if;
-
-  select * into v_participant from room_participants
-    where room_id = v_room.id and seat = p_seat for update;
-
-  if not found then
-    raise exception 'Ungueltiger Platz';
-  end if;
-
-  if v_participant.user_id is null then
-    if v_room.status <> 'setup' then
-      raise exception 'Das Spiel laeuft bereits, dieser Platz ist nicht mehr frei';
-    end if;
-    update room_participants
-      set user_id = auth.uid(), display_name = coalesce(nullif(trim(p_display_name), ''), 'Teilnehmer ' || p_seat)
-      where id = v_participant.id
-      returning * into v_participant;
-  elsif v_participant.user_id = auth.uid() then
-    -- Reconnect: Sitzplatz bereits meiner, ggf. Namen aktualisieren solange Setup-Phase laeuft.
-    if v_room.status = 'setup' and p_display_name is not null and trim(p_display_name) <> '' then
-      update room_participants set display_name = trim(p_display_name)
-        where id = v_participant.id returning * into v_participant;
-    end if;
-  else
-    raise exception 'Dieser Platz ist bereits von jemand anderem belegt';
-  end if;
-
-  return v_participant;
-end;
-$$;
-
--- Aendert den eigenen Anzeigenamen eines Teilnehmers jederzeit (unabhaengig vom Raum-Status,
--- anders als die eingeschraenkte Umbenennung oben in join_room beim Rejoin waehrend 'setup').
-create or replace function public.set_display_name(p_room_id uuid, p_display_name text)
-returns public.room_participants
-language plpgsql security definer set search_path = public as $$
-declare
-  v_participant room_participants;
-begin
-  select * into v_participant from room_participants
-    where room_id = p_room_id and user_id = auth.uid() for update;
-  if not found then
-    raise exception 'Du bist kein Teilnehmer dieses Raums';
-  end if;
-
-  update room_participants
-    set display_name = coalesce(nullif(trim(p_display_name), ''), display_name)
-    where id = v_participant.id
-    returning * into v_participant;
-
-  return v_participant;
-end;
-$$;
-
--- Aendert den Anzeigenamen des Hosts (host-only).
-create or replace function public.set_host_display_name(p_room_id uuid, p_display_name text)
-returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if not exists (select 1 from rooms where id = p_room_id and host_user_id = auth.uid()) then
-    raise exception 'Nur der Host kann seinen Namen aendern';
-  end if;
-  update rooms set host_display_name = nullif(trim(p_display_name), '') where id = p_room_id;
-end;
-$$;
-
+-- Startet das Spiel (wie zuvor: Pool zufaellig auf Baelle verteilen, Team-Slots anlegen) und
+-- verteilt danach zusaetzlich zufaellig Joker auf die neu angelegten Baelle, gemaess
+-- rooms.joker_config (Gesamtchance pro Ball, optionale Gesamt-/Pro-Art-Obergrenzen, Gewichtung).
 create or replace function public.start_game(p_room_id uuid, p_starting_seat int)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -506,7 +209,6 @@ begin
     raise exception 'Pool ist leer';
   end if;
 
-  -- Zufaellige Zuordnung: Pool-Eintraege serverseitig mischen und auf Baelle 1..N verteilen.
   with shuffled as (
     select id as pool_id, category, value, row_number() over (order by random()) as rn
     from content_pool where room_id = p_room_id
@@ -584,9 +286,10 @@ begin
 end;
 $$;
 
--- Oeffnet einen Ball und vergibt zusaetzlich sofort einen etwaigen mitversteckten Joker an den
--- oeffnenden Sitzplatz (unabhaengig davon, ob der Ball spaeter platziert oder per Veto verworfen
--- wird). "Pending" (noch zu platzierender) Ball schliesst per Veto verworfene Baelle aus.
+-- Oeffnet einen Ball (wie zuvor) und vergibt zusaetzlich sofort einen etwaigen mitversteckten
+-- Joker an den oeffnenden Sitzplatz (unabhaengig davon, ob der Ball spaeter platziert oder per
+-- Veto verworfen wird). "Pending" (noch zu platzierender) Ball schliesst jetzt auch per Veto
+-- verworfene Baelle aus.
 create or replace function public.draw_ball(p_room_id uuid, p_ball_number int)
 returns public.balls
 language plpgsql security definer set search_path = public as $$
@@ -633,6 +336,8 @@ begin
 end;
 $$;
 
+-- Platziert einen Ball (wie zuvor), lehnt zusaetzlich per Veto verworfene Baelle ab (koennen
+-- eigentlich nicht mehr "pending" sein, defensive Zusatzpruefung).
 create or replace function public.place_ball(
   p_room_id uuid, p_ball_id uuid, p_field_index int, p_slot_type text, p_slot_ordinal int
 )
@@ -669,8 +374,8 @@ begin
     raise exception 'Kategorie passt nicht in diesen Slot';
   end if;
 
-  insert into draft_log (room_id, seat, ball_id, field_index, slot_type, slot_ordinal, overwritten_ball_id)
-    values (p_room_id, v_seat, p_ball_id, p_field_index, p_slot_type, p_slot_ordinal, v_slot.filled_ball_id);
+  insert into draft_log (room_id, seat, ball_id, field_index, slot_type, slot_ordinal, overwritten_ball_id, action_type)
+    values (p_room_id, v_seat, p_ball_id, p_field_index, p_slot_type, p_slot_ordinal, v_slot.filled_ball_id, 'place');
 
   update team_slots set filled_ball_id = p_ball_id where id = v_slot.id;
   update balls set placed_field = p_field_index, placed_slot_type = p_slot_type, placed_slot_ordinal = p_slot_ordinal
@@ -871,56 +576,8 @@ begin
 end;
 $$;
 
-create or replace function public.lock_team(p_room_id uuid)
-returns void
-language plpgsql security definer set search_path = public as $$
-declare
-  v_room rooms;
-  v_seat int;
-  v_other_seat int;
-  v_other_locked boolean;
-  v_balls_remaining int;
-begin
-  select * into v_room from rooms where id = p_room_id;
-  if not found or v_room.status <> 'drafting' then
-    raise exception 'Das Spiel laeuft gerade nicht';
-  end if;
-
-  v_seat := public.my_seat(p_room_id);
-  if v_seat is null or v_seat <> v_room.current_turn_seat then
-    raise exception 'Du bist nicht am Zug';
-  end if;
-
-  update room_participants set locked = true, locked_at = now()
-    where room_id = p_room_id and seat = v_seat;
-
-  v_other_seat := case v_seat when 1 then 2 else 1 end;
-  select locked into v_other_locked from room_participants where room_id = p_room_id and seat = v_other_seat;
-  select count(*) into v_balls_remaining from balls where room_id = p_room_id and opened = false;
-
-  if v_other_locked or v_balls_remaining = 0 then
-    update rooms set status = 'finished', current_turn_seat = null where id = p_room_id;
-  else
-    update rooms set current_turn_seat = v_other_seat where id = p_room_id;
-  end if;
-end;
-$$;
-
--- Schaltet den transparenten 16:9-Overlay-Modus um (fuer OBS-Layout, Host-only).
-create or replace function public.set_overlay_mode(p_room_id uuid, p_enabled boolean)
-returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if not exists (select 1 from rooms where id = p_room_id and host_user_id = auth.uid()) then
-    raise exception 'Nur der Host kann den Overlay-Modus umschalten';
-  end if;
-  update rooms set overlay_mode = p_enabled where id = p_room_id;
-end;
-$$;
-
--- Setzt den Draft komplett zurueck (geoeffnete Baelle, Platzierungen, Sperren, wer am Zug ist),
--- der Content-Pool und die beigetretenen Teilnehmer bleiben erhalten. Der Host muss danach
--- erneut "Spiel starten" druecken (neuer zufaelliger Shuffle).
+-- reset_draft: zusaetzlich das Joker-Inventar leeren (Content-Pool, joker_config und
+-- pokemon_filters bleiben wie der Rest der Pool-Konfiguration erhalten).
 create or replace function public.reset_draft(p_room_id uuid)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -946,9 +603,12 @@ begin
 end;
 $$;
 
--- Macht die zeitlich letzte Aktion rueckgaengig (Ziehen, Platzieren oder Sperren) — erkannt anhand
--- des juengsten Zeitstempels unter den drei moeglichen Aktionsarten. Host-only, fuer schnelle
--- Fehlerkorrektur waehrend des Drafts gedacht.
+-- undo_last_action: der erste Zweig (letzte Aktion war ein Ziehen) muss per Veto verworfene Baelle
+-- ausschliessen (die sind kein "offener, noch zu platzierender" Ball mehr). Der zweite Zweig
+-- (letzte Aktion laut draft_log) verzweigt jetzt zusaetzlich nach action_type: bei 'veto' wird der
+-- Ball wieder als nicht-verworfen markiert und der verbrauchte Joker zurueckgegeben. Wondertrade-
+-- und Wechseljoker-Einsaetze aendern den Zug nicht und werden bewusst NICHT von Undo erfasst (sie
+-- tauchen nicht in draft_log auf) -- Undo wirkt weiterhin nur auf Ziehen/Platzieren/Veto/Sperren.
 create or replace function public.undo_last_action(p_room_id uuid)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -985,22 +645,17 @@ begin
   if v_pending_ts is not null
      and v_pending_ts >= coalesce(v_log_ts, '-infinity'::timestamptz)
      and v_pending_ts >= coalesce(v_locked_ts, '-infinity'::timestamptz) then
-    -- letzte Aktion war ein Ziehen: Ball wieder verdeckt zurueckversetzen.
     update balls set opened = false, opened_by_seat = null, opened_at = null
       where id = v_pending_ball.id;
 
   elsif v_log_ts is not null
         and v_log_ts >= coalesce(v_locked_ts, '-infinity'::timestamptz) then
     if v_log.action_type = 'veto' then
-      -- letzte Aktion war ein Veto-Einsatz: Ball wieder als nicht-verworfen markieren, verbrauchten
-      -- Joker zurueckgeben, Zug an den vetoenden Sitzplatz zurueckgeben.
       update balls set discarded = false, discarded_at = null where id = v_log.ball_id;
       update player_jokers set used = false, used_at = null, used_detail = null where id = v_log.joker_id;
       delete from draft_log where id = v_log.id;
       update rooms set status = 'drafting', current_turn_seat = v_log.seat where id = p_room_id;
     else
-      -- letzte Aktion war eine Platzierung: Slot und Ball(e) zuruecksetzen, Log-Eintrag entfernen,
-      -- Zug an den platzierenden Sitzplatz zurueckgeben (der vor der Platzierung am Zug war).
       update team_slots set filled_ball_id = v_log.overwritten_ball_id
         where room_id = p_room_id and seat = v_log.seat and field_index = v_log.field_index
           and slot_type = v_log.slot_type and slot_ordinal = v_log.slot_ordinal;
@@ -1020,47 +675,12 @@ begin
     end if;
 
   else
-    -- letzte Aktion war ein Sperren (Lock): Sperre aufheben, Zug an den sperrenden Sitzplatz
-    -- zurueckgeben (der vor dem Sperren am Zug war).
     update room_participants set locked = false, locked_at = null where id = v_locked_participant.id;
     update rooms set status = 'drafting', current_turn_seat = v_locked_participant.seat where id = p_room_id;
   end if;
 end;
 $$;
 
-create or replace function public.claim_obs_view(p_room_id uuid, p_obs_token text)
-returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if not exists (select 1 from rooms where id = p_room_id and obs_token = p_obs_token) then
-    raise exception 'Ungueltiger OBS-Link';
-  end if;
-  insert into room_obs_viewers (room_id, user_id) values (p_room_id, auth.uid())
-    on conflict do nothing;
-end;
-$$;
-
-create or replace function public.regenerate_obs_token(p_room_id uuid)
-returns text
-language plpgsql security definer set search_path = public as $$
-declare
-  v_new_token text := encode(gen_random_bytes(18), 'hex');
-begin
-  if not exists (select 1 from rooms where id = p_room_id and host_user_id = auth.uid()) then
-    raise exception 'Nur der Host kann den OBS-Link erneuern';
-  end if;
-  update rooms set obs_token = v_new_token where id = p_room_id;
-  delete from room_obs_viewers where room_id = p_room_id;
-  return v_new_token;
-end;
-$$;
-
-revoke all on function
-  public.create_room, public.preview_room, public.join_room,
-  public.lock_team, public.claim_obs_view,
-  public.regenerate_obs_token, public.generate_room_code, public.set_overlay_mode,
-  public.set_display_name, public.set_host_display_name
-  from public;
 revoke all on function public.set_joker_config(uuid, jsonb) from public;
 revoke all on function public.set_content_pool(uuid, jsonb, jsonb) from public;
 revoke all on function public.start_game(uuid, int) from public;
@@ -1072,30 +692,13 @@ revoke all on function public.use_wechsel_joker(uuid, uuid, uuid) from public;
 revoke all on function public.reset_draft(uuid) from public;
 revoke all on function public.undo_last_action(uuid) from public;
 
-grant execute on function public.create_room() to authenticated;
 grant execute on function public.set_joker_config(uuid, jsonb) to authenticated;
 grant execute on function public.set_content_pool(uuid, jsonb, jsonb) to authenticated;
-grant execute on function public.preview_room(text) to authenticated;
-grant execute on function public.join_room(text, int, text) to authenticated;
 grant execute on function public.start_game(uuid, int) to authenticated;
 grant execute on function public.draw_ball(uuid, int) to authenticated;
 grant execute on function public.place_ball(uuid, uuid, int, text, int) to authenticated;
 grant execute on function public.use_veto_joker(uuid) to authenticated;
 grant execute on function public.use_wondertrade_joker(uuid, uuid, text) to authenticated;
 grant execute on function public.use_wechsel_joker(uuid, uuid, uuid) to authenticated;
-grant execute on function public.lock_team(uuid) to authenticated;
-grant execute on function public.claim_obs_view(uuid, text) to authenticated;
-grant execute on function public.regenerate_obs_token(uuid) to authenticated;
-grant execute on function public.set_overlay_mode(uuid, boolean) to authenticated;
 grant execute on function public.reset_draft(uuid) to authenticated;
 grant execute on function public.undo_last_action(uuid) to authenticated;
-grant execute on function public.set_display_name(uuid, text) to authenticated;
-grant execute on function public.set_host_display_name(uuid, text) to authenticated;
-
--- =========================================================================
--- 5. REALTIME
--- =========================================================================
-
-alter publication supabase_realtime add table
-  public.rooms, public.room_participants, public.balls, public.ball_contents, public.player_jokers,
-  public.team_slots, public.draft_log, public.room_obs_viewers;

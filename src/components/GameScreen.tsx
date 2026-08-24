@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRoom } from '../hooks/useRoom'
 import { useBalls } from '../hooks/useBalls'
 import { useTeamSlots } from '../hooks/useTeamSlots'
+import { usePlayerJokers } from '../hooks/usePlayerJokers'
 import { useWebRTCMesh } from '../hooks/useWebRTCMesh'
 import { CamGrid, type CamTile } from './CamGrid'
 import { BallsGrid } from './BallsGrid'
 import { TeamPanel } from './TeamPanel'
+import type { JokerFieldMode } from './FieldCard'
+import { JokerBar } from './JokerBar'
 import { TurnBanner } from './TurnBanner'
 import { LockButton } from './LockButton'
 import { GameOverSummary } from './GameOverSummary'
@@ -17,6 +20,8 @@ import { VolumeControl } from './VolumeControl'
 import { useSfxVolume } from '../hooks/useSfxVolume'
 import { rpc } from '../lib/rpc'
 import { joinUrl, obsUrl } from '../lib/urls'
+import { EMPTY_POKEMON_FILTERS, randomPokemonFormCandidates } from '../lib/poolResolution'
+import type { JokerType } from '../lib/jokers'
 import type { Category, Seat } from '../lib/database.types'
 
 export type ViewerRole = 'host' | 'obs' | Seat
@@ -32,9 +37,14 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const { room, participants } = useRoom(roomId)
   const { balls } = useBalls(roomId)
   const { slots } = useTeamSlots(roomId)
+  const { jokers } = usePlayerJokers(roomId)
   const [camEnabled, setCamEnabled] = useState(false)
   const [revealedBallId, setRevealedBallId] = useState<string | null>(null)
   const [sfxVolume, setSfxVolume] = useSfxVolume()
+  const [armedJoker, setArmedJoker] = useState<JokerType | null>(null)
+  const [wechselFirstSlotId, setWechselFirstSlotId] = useState<string | null>(null)
+  const [wechselFirstSlotType, setWechselFirstSlotType] = useState<Category | null>(null)
+  const [jokerError, setJokerError] = useState<string | null>(null)
 
   const mySeat: Seat | null = role === 1 || role === 2 ? role : null
 
@@ -79,6 +89,10 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   // sonst waere die Kategorie schon durch die Markierung erkennbar, bevor sie offiziell gezeigt wird.
   const isRevealed = !!pendingBall && revealedBallId === pendingBall.id
   const selectableCategory: Category | null = isMyBall && isRevealed ? pendingBall!.category : null
+
+  const myJokers = mySeat != null ? jokers.filter((j) => j.seat === mySeat && !j.used) : []
+  const hasVeto = myJokers.some((j) => j.joker_type === 'veto')
+  const canVeto = isMyBall && isRevealed && hasVeto
 
   const [actionError, setActionError] = useState<string | null>(null)
   const showOverlayStage = !!room?.overlay_mode && (role === 'host' || role === 'obs')
@@ -144,6 +158,96 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err))
     }
+  }
+
+  async function handleUseVeto() {
+    setJokerError(null)
+    try {
+      await rpc.useVetoJoker(roomId)
+    } catch (err) {
+      setJokerError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  function handleArmJoker(type: JokerType) {
+    setJokerError(null)
+    setWechselFirstSlotId(null)
+    setWechselFirstSlotType(null)
+    setArmedJoker((current) => (current === type ? null : type))
+  }
+
+  function handleCancelArmedJoker() {
+    setJokerError(null)
+    setArmedJoker(null)
+    setWechselFirstSlotId(null)
+    setWechselFirstSlotType(null)
+  }
+
+  async function handleWondertradePick(ballId: string) {
+    setJokerError(null)
+    const filters = room?.pokemon_filters ?? EMPTY_POKEMON_FILTERS
+    const known = new Set(
+      slots.filter((s) => s.slot_type === 'pokemon' && s.value != null).map((s) => s.value as string),
+    )
+    const candidates = randomPokemonFormCandidates(filters, known)
+    if (candidates.length === 0) {
+      setJokerError('Kein passendes Pokémon mehr verfügbar')
+      return
+    }
+    for (const candidate of candidates.slice(0, 30)) {
+      try {
+        await rpc.useWondertradeJoker(roomId, ballId, candidate)
+        setArmedJoker(null)
+        return
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (!msg.includes('bereits vergeben')) {
+          setJokerError(msg)
+          return
+        }
+        // Kollision mit einem noch versteckten Ball (der Client kennt dessen Wert nicht) —
+        // naechsten Kandidaten probieren.
+      }
+    }
+    setJokerError('Konnte kein neues Pokémon finden (zu viele Duplikate)')
+  }
+
+  async function handleWechselPick(slotId: string, slotType: Category) {
+    setJokerError(null)
+    if (!wechselFirstSlotId) {
+      setWechselFirstSlotId(slotId)
+      setWechselFirstSlotType(slotType)
+      return
+    }
+    if (slotId === wechselFirstSlotId) {
+      setWechselFirstSlotId(null)
+      setWechselFirstSlotType(null)
+      return
+    }
+    try {
+      await rpc.useWechselJoker(roomId, wechselFirstSlotId, slotId)
+      setArmedJoker(null)
+      setWechselFirstSlotId(null)
+      setWechselFirstSlotType(null)
+    } catch (err) {
+      setJokerError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  function jokerModeForSeat(seat: Seat): JokerFieldMode | null {
+    if (armedJoker === 'wondertrade') {
+      return { kind: 'wondertrade', onPickPokemon: handleWondertradePick }
+    }
+    if (armedJoker === 'wechsel') {
+      return {
+        kind: 'wechsel',
+        ownTeam: seat === mySeat,
+        firstSlotId: wechselFirstSlotId,
+        firstSlotType: wechselFirstSlotType,
+        onPickSlot: handleWechselPick,
+      }
+    }
+    return null
   }
 
   async function handleToggleOverlay() {
@@ -274,6 +378,21 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         </div>
       ) : (
         <>
+          <JokerBar
+            jokers={jokers}
+            seat1Name={seat1?.display_name ?? 'Teilnehmer 1'}
+            seat2Name={seat2?.display_name ?? 'Teilnehmer 2'}
+            mySeat={mySeat}
+            isMyTurn={isMyTurn}
+            canVeto={canVeto}
+            armedJoker={armedJoker}
+            wechselAwaitingSecond={!!wechselFirstSlotId}
+            onArm={handleArmJoker}
+            onUseVeto={handleUseVeto}
+            onCancelArm={handleCancelArmedJoker}
+            error={jokerError}
+          />
+
           <TurnBanner room={room} participants={participants} />
           {room.status === 'finished' && <GameOverSummary />}
 
@@ -284,10 +403,11 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               locked={seat1?.locked ?? false}
               isYourTurn={room.status === 'drafting' && room.current_turn_seat === 1}
               slots={slots.filter((s) => s.seat === 1)}
-              selectableCategory={mySeat === 1 ? selectableCategory : null}
+              selectableCategory={mySeat === 1 && !armedJoker ? selectableCategory : null}
               onSelectSlot={mySeat === 1 ? handleSelectSlot : undefined}
               editable={mySeat === 1}
               onRename={mySeat === 1 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
+              jokerMode={jokerModeForSeat(1)}
             />
 
             <div className="w-full lg:w-[500px] shrink-0">
@@ -306,6 +426,8 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 mySeat={mySeat}
                 activeSeat={room.current_turn_seat}
                 sfxVolume={sfxVolume}
+                canVeto={canVeto}
+                onVeto={handleUseVeto}
               />
             </div>
 
@@ -315,11 +437,12 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               locked={seat2?.locked ?? false}
               isYourTurn={room.status === 'drafting' && room.current_turn_seat === 2}
               slots={slots.filter((s) => s.seat === 2)}
-              selectableCategory={mySeat === 2 ? selectableCategory : null}
+              selectableCategory={mySeat === 2 && !armedJoker ? selectableCategory : null}
               onSelectSlot={mySeat === 2 ? handleSelectSlot : undefined}
               editable={mySeat === 2}
               onRename={mySeat === 2 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
               align="right"
+              jokerMode={jokerModeForSeat(2)}
             />
           </div>
 

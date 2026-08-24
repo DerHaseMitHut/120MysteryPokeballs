@@ -195,6 +195,22 @@ export function resolveCategoryPool(category: Category, config: CategoryConfig):
   return [...manualValues, ...additional]
 }
 
+// Liefert eine zufaellig gemischte Liste moeglicher neuer Pokemon-Formen fuer den
+// Wondertrade-Joker: alle Formen aller Master-Eintraege, die die uebergebenen Filter erfuellen,
+// abzueglich der als "bereits bekannt" uebergebenen Namen (das eigene/gegnerische Team). Der
+// Aufrufer probiert die Liste der Reihe nach durch und faengt serverseitige Duplikat-Ablehnungen
+// ab (der Client kennt die noch versteckten Baelle nicht, siehe use_wondertrade_joker in
+// schema.sql) -- deshalb absichtlich eine ganze Liste statt nur eines einzelnen Zufallswerts.
+export function randomPokemonFormCandidates(filters: PokemonFilters, excludeNames: Set<string>): string[] {
+  const eligible = applyPokemonFilters(POKEMON_MASTER, filters)
+  const pool = eligible.flatMap((e) => e.forms.map((f) => f.name)).filter((name) => !excludeNames.has(name))
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  return pool
+}
+
 export function resolvePool(config: PoolConfig): { category: Category; value: string }[] {
   const result: { category: Category; value: string }[] = []
   for (const category of CATEGORY_ORDER) {

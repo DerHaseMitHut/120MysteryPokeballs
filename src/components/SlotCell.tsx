@@ -9,9 +9,13 @@ interface Props {
   ballId?: string | null
   selectable?: boolean
   onSelect?: () => void
+  // 'pink' markiert eine Joker-Zielauswahl (statt der normalen gelben Ball-Platzierung).
+  accent?: 'yellow' | 'pink'
+  // Zusaetzlicher Ring fuer "das ist gerade als erster Slot eines Wechseljoker-Tauschs gewaehlt".
+  selected?: boolean
 }
 
-export function SlotCell({ slotType, value, filled, ballId = null, selectable, onSelect }: Props) {
+export function SlotCell({ slotType, value, filled, ballId = null, selectable, onSelect, accent = 'yellow', selected }: Props) {
   const colorClass = CATEGORY_COLORS[slotType]
   const flashing = useFlashOnChange(ballId)
 
@@ -24,7 +28,7 @@ export function SlotCell({ slotType, value, filled, ballId = null, selectable, o
   )
 
   const stateClass = selectable
-    ? 'border-yellow-400 bg-neutral-800 hover:bg-neutral-700 cursor-pointer'
+    ? `${accent === 'pink' ? 'border-pink-400' : 'border-yellow-400'} bg-neutral-800 hover:bg-neutral-700 cursor-pointer`
     : filled
       ? `${CATEGORY_FILLED_STYLE[slotType]} cursor-default`
       : 'border-white/10 bg-neutral-900/60 cursor-default'
@@ -34,7 +38,7 @@ export function SlotCell({ slotType, value, filled, ballId = null, selectable, o
       type="button"
       disabled={!selectable}
       onClick={onSelect}
-      className={`w-full rounded-md border px-3 py-2.5 min-h-[3.75rem] text-sm flex flex-col items-start justify-center gap-1 text-left transition ${stateClass} ${flashing ? 'slot-flash' : ''}`}
+      className={`w-full rounded-md border px-3 py-2.5 min-h-[3.75rem] text-sm flex flex-col items-start justify-center gap-1 text-left transition ${stateClass} ${flashing ? 'slot-flash' : ''} ${selected ? 'ring-2 ring-pink-400' : ''}`}
     >
       <span className={`px-1 rounded ${colorClass} text-white text-[9px] font-semibold leading-tight`}>
         {CATEGORY_LABELS[slotType]}

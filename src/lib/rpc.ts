@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient'
 import type { Category, PreviewRoomResult, RoomParticipantRow, RoomRow, Seat, BallRow } from './database.types'
+import type { JokerConfig } from './jokers'
+import type { PokemonFilters } from './poolResolution'
 
 async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args)
@@ -10,8 +12,14 @@ async function call<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 export const rpc = {
   createRoom: () => call<RoomRow>('create_room', {}),
 
-  setContentPool: (roomId: string, pool: { category: Category; value: string }[]) =>
-    call<void>('set_content_pool', { p_room_id: roomId, p_pool: pool }),
+  setContentPool: (
+    roomId: string,
+    pool: { category: Category; value: string }[],
+    pokemonFilters: PokemonFilters | null = null,
+  ) => call<void>('set_content_pool', { p_room_id: roomId, p_pool: pool, p_pokemon_filters: pokemonFilters }),
+
+  setJokerConfig: (roomId: string, config: JokerConfig) =>
+    call<void>('set_joker_config', { p_room_id: roomId, p_config: config }),
 
   previewRoom: (code: string) => call<PreviewRoomResult>('preview_room', { p_code: code }),
 
@@ -38,6 +46,18 @@ export const rpc = {
       p_slot_type: slotType,
       p_slot_ordinal: slotOrdinal,
     }),
+
+  useVetoJoker: (roomId: string) => call<void>('use_veto_joker', { p_room_id: roomId }),
+
+  useWondertradeJoker: (roomId: string, targetBallId: string, newValue: string) =>
+    call<void>('use_wondertrade_joker', {
+      p_room_id: roomId,
+      p_target_ball_id: targetBallId,
+      p_new_value: newValue,
+    }),
+
+  useWechselJoker: (roomId: string, slotAId: string, slotBId: string) =>
+    call<void>('use_wechsel_joker', { p_room_id: roomId, p_slot_a_id: slotAId, p_slot_b_id: slotBId }),
 
   lockTeam: (roomId: string) => call<void>('lock_team', { p_room_id: roomId }),
 

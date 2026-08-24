@@ -1,4 +1,4 @@
-import { FieldCard } from './FieldCard'
+import { FieldCard, type JokerFieldMode } from './FieldCard'
 import { EditableName } from './EditableName'
 import type { TeamSlotWithValue } from '../hooks/useTeamSlots'
 import type { Category, Seat } from '../lib/database.types'
@@ -14,6 +14,7 @@ interface Props {
   align?: 'left' | 'right'
   editable?: boolean
   onRename?: (name: string) => Promise<unknown>
+  jokerMode?: JokerFieldMode | null
 }
 
 export function TeamPanel({
@@ -27,6 +28,7 @@ export function TeamPanel({
   align = 'left',
   editable = false,
   onRename,
+  jokerMode,
 }: Props) {
   return (
     <div
@@ -67,6 +69,7 @@ export function TeamPanel({
                 ? (slotType, slotOrdinal) => onSelectSlot(fieldIndex, slotType, slotOrdinal)
                 : undefined
             }
+            jokerMode={jokerMode}
           />
         ))}
       </div>

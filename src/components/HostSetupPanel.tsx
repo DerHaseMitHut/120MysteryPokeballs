@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { PoolConfigPanel } from './PoolConfigPanel'
 import { defaultPoolConfig, resolvePool, validatePoolConfig, type PoolConfig } from '../lib/poolResolution'
+import { JokerConfigPanel } from './JokerConfigPanel'
+import { defaultJokerConfig, validateJokerConfig, type JokerConfig } from '../lib/jokers'
 import { InviteLinksPanel } from './InviteLinksPanel'
 import { rpc } from '../lib/rpc'
 import type { RoomParticipantRow, RoomRow, Seat } from '../lib/database.types'
@@ -12,18 +14,20 @@ interface Props {
 
 export function HostSetupPanel({ room, participants }: Props) {
   const [poolConfig, setPoolConfig] = useState<PoolConfig>(defaultPoolConfig())
+  const [jokerConfig, setJokerConfig] = useState<JokerConfig>(defaultJokerConfig())
   const [startingSeat, setStartingSeat] = useState<Seat>(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const bothJoined = participants.length === 2 && participants.every((p) => p.user_id)
-  const validationErrors = validatePoolConfig(poolConfig)
+  const validationErrors = [...validatePoolConfig(poolConfig), ...validateJokerConfig(jokerConfig)]
 
   async function handleStart() {
     setBusy(true)
     setError(null)
     try {
-      await rpc.setContentPool(room.id, resolvePool(poolConfig))
+      await rpc.setContentPool(room.id, resolvePool(poolConfig), poolConfig.pokemon.pokemonFilters ?? null)
+      await rpc.setJokerConfig(room.id, jokerConfig)
       await rpc.startGame(room.id, startingSeat)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -44,6 +48,17 @@ export function HostSetupPanel({ room, participants }: Props) {
           </p>
         </div>
         <PoolConfigPanel value={poolConfig} onChange={setPoolConfig} />
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/30 backdrop-blur-sm p-5">
+        <div>
+          <h2 className="text-lg font-bold text-white">Joker</h2>
+          <p className="text-sm text-neutral-400 mt-0.5">
+            Joker stecken zusätzlich zum Standardinhalt eines Balls mit drin (z.B. Pokémon + Joker). Wer einen Ball
+            mit Joker öffnet, bekommt ihn sofort und kann ihn während seines Zugs einsetzen.
+          </p>
+        </div>
+        <JokerConfigPanel value={jokerConfig} onChange={setJokerConfig} />
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-neutral-900/60 shadow-xl shadow-black/30 backdrop-blur-sm p-5">

@@ -26,6 +26,8 @@ interface Props {
   mySeat: Seat | null
   activeSeat: Seat | null
   sfxVolume: number
+  canVeto?: boolean
+  onVeto?: () => void
 }
 
 export function BallsGrid({
@@ -43,6 +45,8 @@ export function BallsGrid({
   mySeat,
   activeSeat,
   sfxVolume,
+  canVeto,
+  onVeto,
 }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -190,6 +194,8 @@ export function BallsGrid({
             openerName={openerName}
             onRevealed={onRevealed}
             sfxVolume={sfxVolume}
+            canVeto={canVeto}
+            onVeto={onVeto}
           />
         ) : (
           <div className="grid grid-cols-5 gap-2.5 h-full">

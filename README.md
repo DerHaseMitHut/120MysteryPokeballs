@@ -45,6 +45,28 @@ Teilnehmer 1, Teilnehmer 2) — gleiches Profil in mehreren Tabs teilt dieselbe 
 6. Der Host findet unter "Links & Raumcode anzeigen" jederzeit einen OBS-Browser-Source-Link (1920×1080,
    schreibgeschützt) zum Streamen.
 
+## Joker
+
+Zusätzlich zu ihrem Standardinhalt können Bälle einen von drei Jokern enthalten (z.B. Pokémon +
+Joker). Chance pro Ball, optionale Gesamt-/Pro-Art-Obergrenzen und Gewichtung stellt der Host vor
+Spielstart im Setup-Bildschirm ein ("Joker"-Bereich). Wer einen Ball mit Joker öffnet, bekommt ihn
+sofort und kann ihn während seines eigenen Zugs einmalig einsetzen — die Joker-Leiste zwischen
+Kamera- und Team-Ansicht zeigt für beide Teilnehmer öffentlich, wer welchen Joker zur Verfügung
+hat.
+
+- **Veto**: Verwirft den gerade gezogenen Ball, ohne ihn platzieren zu müssen (löst sich direkt in
+  der Ball-Enthüllung oder über die Joker-Leiste).
+- **Wondertrade**: Würfelt ein bereits platziertes Pokémon (eigenes oder gegnerisches) neu aus,
+  gemäß der beim Pool-Setup gewählten Pokémon-Filter. In der Joker-Leiste anklicken, danach ein
+  Pokémon in einem der beiden Teams auswählen.
+- **Wechsel**: Tauscht zwei gleichartige Slots im eigenen Team (z.B. zwei Pokémon oder zwei
+  Attacken). In der Joker-Leiste anklicken, danach nacheinander zwei eigene Slots derselben Art
+  auswählen.
+
+Eigene Icons für die drei Joker lassen sich unter [`public/joker-icons/`](public/joker-icons/)
+ablegen (`veto.png`, `wondertrade.png`, `wechsel.png`) — ohne eigene Bilder zeigt die App
+automatisch Emoji-Platzhalter.
+
 ## Wichtige Sicherheitseigenschaft
 
 Die Zensur (Teilnehmer sehen vom Gegner-Team nur Kategorien wie "Item"/"Attacke", nie den Wert) wird **serverseitig
