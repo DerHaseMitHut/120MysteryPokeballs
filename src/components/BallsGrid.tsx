@@ -187,9 +187,11 @@ export function BallsGrid({
         </div>
       </div>
 
-      {/* Feste 5:4-Flaeche (5 Spalten x 4 Reihen quadratischer Zellen), damit das Reveal-Overlay
-          exakt die gleiche Flaeche einnimmt, die sonst die Ball-Kacheln belegen. */}
-      <div className="relative aspect-[5/4]">
+      {/* Feste 5:4-Flaeche (5 Spalten x 4 Reihen quadratischer Zellen) fuer das Ball-Grid. Waehrend
+          ein Ball aufgedeckt wird, bekommt dieselbe Flaeche zusaetzlich eine Mindesthoehe -- der
+          Reveal-Inhalt (Sprite + Name + ggf. Joker-Banner/Veto-Button) braucht mehr Platz, als die
+          5:4-Flaeche allein hergibt; die Box waechst dafuer bewusst etwas nach unten. */}
+      <div className={`relative aspect-[5/4] ${revealBall ? 'min-h-[560px]' : ''}`}>
         {revealBall ? (
           <BallRevealOverlay
             ball={revealBall}

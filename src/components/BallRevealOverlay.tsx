@@ -203,52 +203,52 @@ export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVol
       )}
 
       <div
-        className="relative z-10 flex flex-col items-center gap-1.5 px-6 py-3 text-center transition-opacity ease-in"
+        className="relative z-10 flex flex-col items-center gap-3 px-6 py-4 text-center transition-opacity ease-in"
         style={{
           transitionDuration: `${FADE_MS}ms`,
           opacity: revealing || videoFailed ? 1 : 0,
           pointerEvents: revealing || videoFailed ? 'auto' : 'none',
         }}
       >
-        <span className="text-xs text-neutral-400">
+        <span className="text-sm text-neutral-400">
           Ball #{ball.number} geöffnet von {openerName}
         </span>
-        <span className={`px-3 py-1 rounded-lg text-sm font-semibold text-white ${colorClass}`}>
+        <span className={`px-3.5 py-1.5 rounded-lg text-base font-semibold text-white ${colorClass}`}>
           {CATEGORY_LABELS[ball.category]}
         </span>
         {spriteUrl && (
           <img
             src={spriteUrl}
             alt={ball.value ?? ''}
-            className="h-24 w-24 object-contain [image-rendering:pixelated] drop-shadow-lg"
+            className="h-44 w-44 object-contain [image-rendering:pixelated] drop-shadow-lg"
           />
         )}
-        <span className={`text-3xl font-extrabold ${known ? 'text-white' : 'text-neutral-500 italic'}`}>
+        <span className={`text-4xl font-extrabold ${known ? 'text-white' : 'text-neutral-500 italic'}`}>
           {known ? ball.value : 'zensiert'}
         </span>
         {joker && (
           <div
-            className={`flex items-center gap-1.5 rounded-full border border-pink-400/60 bg-pink-400/10 px-3 py-1 ${revealing ? 'joker-pop' : 'opacity-0'}`}
+            className={`flex items-center gap-2 rounded-full border border-pink-400/60 bg-pink-400/10 px-3.5 py-1.5 ${revealing ? 'joker-pop' : 'opacity-0'}`}
           >
-            <JokerIcon type={joker} className="h-6 w-6" />
-            <span className="text-sm font-bold text-pink-300">Zusätzlich: {JOKER_LABELS[joker]}-Joker!</span>
+            <JokerIcon type={joker} className="h-8 w-8" />
+            <span className="text-base font-bold text-pink-300">Zusätzlich: {JOKER_LABELS[joker]}-Joker!</span>
           </div>
         )}
         {isMine ? (
           <>
-            <span className="text-sm text-yellow-300 mt-0.5">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
+            <span className="text-base text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>
             {canVeto && (
               <button
                 type="button"
                 onClick={onVeto}
-                className="rounded-lg border border-pink-400/60 bg-pink-400/10 hover:bg-pink-400/20 px-3 py-1 text-xs text-pink-300 transition"
+                className="mt-1 rounded-lg border border-pink-400/60 bg-pink-400/10 hover:bg-pink-400/20 px-3.5 py-1.5 text-sm text-pink-300 transition"
               >
                 🚫 Veto-Joker einsetzen (Ball verwerfen)
               </button>
             )}
           </>
         ) : (
-          <span className="text-xs text-neutral-500 mt-0.5">wird gerade platziert…</span>
+          <span className="text-sm text-neutral-500 mt-1">wird gerade platziert…</span>
         )}
       </div>
     </div>

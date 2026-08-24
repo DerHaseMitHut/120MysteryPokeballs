@@ -75,7 +75,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
 
   const pendingBall = useMemo(() => {
     for (const ball of balls.values()) {
-      if (ball.opened && ball.placed_field == null) return ball
+      if (ball.opened && ball.placed_field == null && !ball.discarded) return ball
     }
     return null
   }, [balls])
