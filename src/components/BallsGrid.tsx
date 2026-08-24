@@ -4,6 +4,7 @@ import { BallRevealOverlay } from './BallRevealOverlay'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallWithValue } from '../hooks/useBalls'
 import type { Seat } from '../lib/database.types'
+import type { JokerType } from '../lib/jokers'
 
 const PER_PAGE = 20
 
@@ -28,6 +29,7 @@ interface Props {
   sfxVolume: number
   canVeto?: boolean
   onVeto?: () => void
+  revealJoker?: JokerType | null
 }
 
 export function BallsGrid({
@@ -47,6 +49,7 @@ export function BallsGrid({
   sfxVolume,
   canVeto,
   onVeto,
+  revealJoker,
 }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -196,6 +199,7 @@ export function BallsGrid({
             sfxVolume={sfxVolume}
             canVeto={canVeto}
             onVeto={onVeto}
+            joker={revealJoker}
           />
         ) : (
           <div className="grid grid-cols-5 gap-2.5 h-full">

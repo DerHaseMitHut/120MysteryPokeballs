@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '../lib/categories'
 import { getPokemonSpriteUrl } from '../lib/pokeSprites'
+import { JOKER_LABELS, type JokerType } from '../lib/jokers'
+import { JokerIcon } from './JokerIcon'
 import type { BallWithValue } from '../hooks/useBalls'
 
 interface Props {
@@ -11,6 +13,9 @@ interface Props {
   sfxVolume: number
   canVeto?: boolean
   onVeto?: () => void
+  // Zusaetzlicher Joker, der in diesem Ball mitversteckt war (falls vorhanden) -- wird zusammen
+  // mit dem restlichen Inhalt aufgedeckt (siehe "revealing"-Faded-in-Block unten).
+  joker?: JokerType | null
 }
 
 const VIDEO_SRC = '/pokeball-animation.mp4'
@@ -77,7 +82,7 @@ function playAudioCue(
 // ausgelesen, nicht hart codiert, damit ein spaeteres Austauschen der Datei einfach bleibt.
 // Start ist an ball.opened_at (Server-Zeit) gekoppelt, nicht an den lokalen Mount-Zeitpunkt, damit
 // die Animation bei allen Teilnehmern synchron laeuft statt je nach Netzwerk-Latenz versetzt.
-export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVolume, canVeto, onVeto }: Props) {
+export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVolume, canVeto, onVeto, joker }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [grown, setGrown] = useState(false)
   const [revealing, setRevealing] = useState(false)
@@ -221,6 +226,14 @@ export function BallRevealOverlay({ ball, isMine, openerName, onRevealed, sfxVol
         <span className={`text-4xl font-extrabold ${known ? 'text-white' : 'text-neutral-500 italic'}`}>
           {known ? ball.value : 'zensiert'}
         </span>
+        {joker && (
+          <div
+            className={`flex items-center gap-2 rounded-full border border-pink-400/60 bg-pink-400/10 px-3.5 py-1.5 ${revealing ? 'joker-pop' : 'opacity-0'}`}
+          >
+            <JokerIcon type={joker} className="h-8 w-8" />
+            <span className="text-base font-bold text-pink-300">Zusätzlich: {JOKER_LABELS[joker]}-Joker!</span>
+          </div>
+        )}
         {isMine ? (
           <>
             <span className="text-base text-yellow-300 mt-1">Wähle jetzt einen passenden Slot in deinem Team ↓</span>

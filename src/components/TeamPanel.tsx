@@ -1,7 +1,9 @@
 import { FieldCard, type JokerFieldMode } from './FieldCard'
 import { EditableName } from './EditableName'
+import { PlayerJokerBadges } from './PlayerJokerBadges'
 import type { TeamSlotWithValue } from '../hooks/useTeamSlots'
-import type { Category, Seat } from '../lib/database.types'
+import type { Category, PlayerJokerRow, Seat } from '../lib/database.types'
+import type { JokerType } from '../lib/jokers'
 
 interface Props {
   seat: Seat
@@ -15,6 +17,12 @@ interface Props {
   editable?: boolean
   onRename?: (name: string) => Promise<unknown>
   jokerMode?: JokerFieldMode | null
+  jokers?: PlayerJokerRow[]
+  jokersClickable?: boolean
+  canVeto?: boolean
+  armedJoker?: JokerType | null
+  onArmJoker?: (type: JokerType) => void
+  onUseVeto?: () => void
 }
 
 export function TeamPanel({
@@ -29,6 +37,12 @@ export function TeamPanel({
   editable = false,
   onRename,
   jokerMode,
+  jokers = [],
+  jokersClickable = false,
+  canVeto = false,
+  armedJoker = null,
+  onArmJoker,
+  onUseVeto,
 }: Props) {
   return (
     <div
@@ -55,6 +69,16 @@ export function TeamPanel({
           <span className="text-[10px] uppercase tracking-wide bg-yellow-500 text-black px-1.5 py-0.5 rounded">
             am Zug
           </span>
+        )}
+        {onArmJoker && onUseVeto && (
+          <PlayerJokerBadges
+            jokers={jokers}
+            clickable={jokersClickable}
+            canVeto={canVeto}
+            armedJoker={armedJoker}
+            onArm={onArmJoker}
+            onUseVeto={onUseVeto}
+          />
         )}
       </div>
       <div className="grid grid-cols-2 gap-3">

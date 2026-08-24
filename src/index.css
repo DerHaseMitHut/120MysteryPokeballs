@@ -69,6 +69,45 @@ body {
   animation: slot-flash 0.9s ease-out;
 }
 
+/* Joker-Enthuellung in der Ball-Reveal-Ansicht: springt sichtbar herein, sobald der restliche
+   Ball-Inhalt aufgedeckt wird (siehe BallRevealOverlay -- "revealing"-Zustand). */
+@keyframes joker-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.joker-pop {
+  animation: joker-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Kurzes Aufblitzen fuer ein einzelnes Joker-Badge (Team-Header), sobald sich seine Anzahl
+   aendert -- v.a. wenn ein frisch enthuellter Joker dort neu auftaucht. */
+@keyframes joker-badge-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.9);
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(244, 114, 182, 0);
+    transform: scale(1);
+  }
+}
+.joker-badge-flash {
+  animation: joker-badge-flash 0.7s ease-out;
+}
+
 /* Doppel-Regler (Min+Max auf einer Leiste): zwei uebereinandergelegte <input type="range">,
    deren Spur transparent/klickunempfindlich ist -- nur die beiden Griffe selbst reagieren auf
    Maus/Touch, damit man sie unabhaengig voneinander verschieben kann. Die eigentliche farbige

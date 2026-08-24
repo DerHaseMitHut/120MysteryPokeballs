@@ -8,7 +8,7 @@ import { CamGrid, type CamTile } from './CamGrid'
 import { BallsGrid } from './BallsGrid'
 import { TeamPanel } from './TeamPanel'
 import type { JokerFieldMode } from './FieldCard'
-import { JokerBar } from './JokerBar'
+import { JOKER_LABELS } from '../lib/jokers'
 import { TurnBanner } from './TurnBanner'
 import { LockButton } from './LockButton'
 import { GameOverSummary } from './GameOverSummary'
@@ -93,6 +93,19 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const myJokers = mySeat != null ? jokers.filter((j) => j.seat === mySeat && !j.used) : []
   const hasVeto = myJokers.some((j) => j.joker_type === 'veto')
   const canVeto = isMyBall && isRevealed && hasVeto
+
+  // Der Joker eines gerade offenen, noch nicht enthuellten Balls wird bewusst NICHT sofort in der
+  // Team-Leiste angezeigt (das wuerde die Spannung der Ball-Enthuellung nehmen) -- stattdessen
+  // erst zusammen mit der Enthuellung in der Mitte gezeigt (siehe BallRevealOverlay/joker-Prop)
+  // und taucht erst danach (isRevealed) bei den Badges des jeweiligen Sitzplatzes auf.
+  const pendingJoker = pendingBall
+    ? jokers.find((j) => j.source_ball_id === pendingBall.id && !j.used) ?? null
+    : null
+  const hiddenPendingJokerId = pendingJoker && !isRevealed ? pendingJoker.id : null
+
+  function jokersForSeat(seat: Seat): typeof jokers {
+    return jokers.filter((j) => j.seat === seat && !j.used && j.id !== hiddenPendingJokerId)
+  }
 
   const [actionError, setActionError] = useState<string | null>(null)
   const showOverlayStage = !!room?.overlay_mode && (role === 'host' || role === 'obs')
@@ -359,6 +372,9 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
       {room.status !== 'setup' && actionError && (
         <p className="text-center text-sm text-red-400">{actionError}</p>
       )}
+      {room.status !== 'setup' && jokerError && (
+        <p className="text-center text-sm text-red-400">{jokerError}</p>
+      )}
 
       {room.status === 'setup' ? (
         role === 'host' ? (
@@ -378,23 +394,27 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         </div>
       ) : (
         <>
-          <JokerBar
-            jokers={jokers}
-            seat1Name={seat1?.display_name ?? 'Teilnehmer 1'}
-            seat2Name={seat2?.display_name ?? 'Teilnehmer 2'}
-            mySeat={mySeat}
-            isMyTurn={isMyTurn}
-            canVeto={canVeto}
-            armedJoker={armedJoker}
-            wechselAwaitingSecond={!!wechselFirstSlotId}
-            onArm={handleArmJoker}
-            onUseVeto={handleUseVeto}
-            onCancelArm={handleCancelArmedJoker}
-            error={jokerError}
-          />
-
           <TurnBanner room={room} participants={participants} />
           {room.status === 'finished' && <GameOverSummary />}
+
+          {armedJoker && (
+            <div className="flex items-center justify-center gap-2 text-xs text-pink-300">
+              <span>
+                {armedJoker === 'wondertrade'
+                  ? `${JOKER_LABELS.wondertrade} aktiv: Wähle ein Pokémon (eigenes oder gegnerisches)`
+                  : wechselFirstSlotId
+                    ? `${JOKER_LABELS.wechsel} aktiv: Wähle das zweite Feld`
+                    : `${JOKER_LABELS.wechsel} aktiv: Wähle zwei gleichartige Felder in deinem Team`}
+              </span>
+              <button
+                type="button"
+                onClick={handleCancelArmedJoker}
+                className="rounded bg-neutral-800 hover:bg-neutral-700 border border-white/10 px-2 py-0.5 text-neutral-300"
+              >
+                Abbrechen
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-start">
             <TeamPanel
@@ -408,6 +428,12 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               editable={mySeat === 1}
               onRename={mySeat === 1 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
               jokerMode={jokerModeForSeat(1)}
+              jokers={jokersForSeat(1)}
+              jokersClickable={mySeat === 1 && isMyTurn}
+              canVeto={canVeto}
+              armedJoker={armedJoker}
+              onArmJoker={handleArmJoker}
+              onUseVeto={handleUseVeto}
             />
 
             <div className="w-full lg:w-[500px] shrink-0">
@@ -428,6 +454,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 sfxVolume={sfxVolume}
                 canVeto={canVeto}
                 onVeto={handleUseVeto}
+                revealJoker={pendingJoker?.joker_type ?? null}
               />
             </div>
 
@@ -443,6 +470,12 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               onRename={mySeat === 2 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
               align="right"
               jokerMode={jokerModeForSeat(2)}
+              jokers={jokersForSeat(2)}
+              jokersClickable={mySeat === 2 && isMyTurn}
+              canVeto={canVeto}
+              armedJoker={armedJoker}
+              onArmJoker={handleArmJoker}
+              onUseVeto={handleUseVeto}
             />
           </div>
 
