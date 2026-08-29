@@ -179,13 +179,11 @@ function resolveAttackePool(config: CategoryConfig): string[] {
   return selected.map((m) => m.name)
 }
 
-export function resolveCategoryPool(category: Category, rawConfig: CategoryConfig): string[] {
-  // manualSelection bleibt im State erhalten, auch wenn zwischenzeitlich zurueck auf "Zufaellig"
-  // umgeschaltet wird (der Modus-Umschalter loescht sie bewusst nicht, damit sie beim erneuten
-  // Wechsel auf "Manuell" wieder da sind) -- fuer die Aufloesung zaehlt sie deshalb nur im
-  // Manuell-Modus, sonst wuerden im Zufalls-Modus zuvor angehakte Eintraege weiterhin erzwungen.
-  const config = rawConfig.mode === 'manual' ? rawConfig : { ...rawConfig, manualSelection: [] }
-
+// manualSelection zaehlt bewusst UNABHAENGIG von "mode": "Manuell" schaltet nur die Checkliste in
+// der UI sichtbar, angehakte Eintraege bleiben aber auch nach dem Zurueckschalten auf "Zufaellig"
+// garantiert im Pool -- so lassen sich gezielt einzelne Werte fix vorgeben und der Rest trotzdem
+// bequem zufaellig auffuellen, ohne dauerhaft in der Checklisten-Ansicht bleiben zu muessen.
+export function resolveCategoryPool(category: Category, config: CategoryConfig): string[] {
   if (category === 'pokemon') {
     const filtered = applyPokemonFilters(POKEMON_MASTER, config.pokemonFilters ?? EMPTY_POKEMON_FILTERS)
     const manualNames = new Set(config.manualSelection)
@@ -244,7 +242,7 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       errors.push(`${label}: mindestens ${SLOT_MINIMUMS[category]} noetig (aktuell ${cfg.count})`)
       continue
     }
-    if (cfg.mode === 'manual' && cfg.manualSelection.length > cfg.count) {
+    if (cfg.manualSelection.length > cfg.count) {
       errors.push(`${label}: ${cfg.manualSelection.length} angehakt, aber nur ${cfg.count} konfiguriert`)
       continue
     }
@@ -284,15 +282,14 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       if (powerAvailable < minPowerCount) {
         errors.push(`${label}: nur ${powerAvailable} Attacken mit Basiswert >= ${filters.powerThreshold} verfuegbar, aber ${minPowerCount} gefordert`)
       }
-      const manualSelection = cfg.mode === 'manual' ? cfg.manualSelection : []
       const manualStatusCount = ATTACKEN_MASTER.filter(
-        (m) => manualSelection.includes(m.name) && m.category === 'status',
+        (m) => cfg.manualSelection.includes(m.name) && m.category === 'status',
       ).length
       if (manualStatusCount > maxStatusCount) {
         errors.push(`${label}: ${manualStatusCount} manuell angehakte Status-Attacken ueberschreiten den Maximalanteil (${maxStatusCount})`)
       }
       const manualPowerCount = ATTACKEN_MASTER.filter(
-        (m) => manualSelection.includes(m.name) && isHighPower(m, filters.powerThreshold),
+        (m) => cfg.manualSelection.includes(m.name) && isHighPower(m, filters.powerThreshold),
       ).length
       if (manualPowerCount > maxPowerCount) {
         errors.push(`${label}: ${manualPowerCount} manuell angehakte starke Attacken ueberschreiten den Maximalanteil (${maxPowerCount})`)
