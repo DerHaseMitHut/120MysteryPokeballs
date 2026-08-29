@@ -129,9 +129,14 @@ function resolveAttackePool(config: CategoryConfig): string[] {
   let pool = ATTACKEN_MASTER.filter((m) => !manualNames.has(m.name))
 
   const minStatusCount = Math.ceil((filters.minStatusPercent / 100) * config.count)
-  const maxStatusCount = Math.floor((filters.maxStatusPercent / 100) * config.count)
+  // max wird mit floor gerundet (garantiert "hoechstens X%"), min mit ceil (garantiert
+  // "mindestens X%") -- bei gleichem Prozentwert auf beiden Seiten (z.B. exakt 30/30) koennen
+  // diese bei nicht glatt teilbarer Gesamtzahl sonst auseinanderfallen (ceil(30%) > floor(30%)),
+  // wodurch der Mindest-Zug den Maximal-Deckel technisch schon vor der Fuell-Phase ueberschreitet.
+  // Der Max-Wert wird deshalb nie kleiner als der Min-Wert zugelassen.
+  const maxStatusCount = Math.max(minStatusCount, Math.floor((filters.maxStatusPercent / 100) * config.count))
   const minPowerCount = Math.ceil((filters.minPowerPercent / 100) * config.count)
-  const maxPowerCount = Math.floor((filters.maxPowerPercent / 100) * config.count)
+  const maxPowerCount = Math.max(minPowerCount, Math.floor((filters.maxPowerPercent / 100) * config.count))
 
   const selected = [...manualEntries]
   const statusSoFar = selected.filter((m) => m.category === 'status').length
@@ -174,7 +179,13 @@ function resolveAttackePool(config: CategoryConfig): string[] {
   return selected.map((m) => m.name)
 }
 
-export function resolveCategoryPool(category: Category, config: CategoryConfig): string[] {
+export function resolveCategoryPool(category: Category, rawConfig: CategoryConfig): string[] {
+  // manualSelection bleibt im State erhalten, auch wenn zwischenzeitlich zurueck auf "Zufaellig"
+  // umgeschaltet wird (der Modus-Umschalter loescht sie bewusst nicht, damit sie beim erneuten
+  // Wechsel auf "Manuell" wieder da sind) -- fuer die Aufloesung zaehlt sie deshalb nur im
+  // Manuell-Modus, sonst wuerden im Zufalls-Modus zuvor angehakte Eintraege weiterhin erzwungen.
+  const config = rawConfig.mode === 'manual' ? rawConfig : { ...rawConfig, manualSelection: [] }
+
   if (category === 'pokemon') {
     const filtered = applyPokemonFilters(POKEMON_MASTER, config.pokemonFilters ?? EMPTY_POKEMON_FILTERS)
     const manualNames = new Set(config.manualSelection)
@@ -233,7 +244,7 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       errors.push(`${label}: mindestens ${SLOT_MINIMUMS[category]} noetig (aktuell ${cfg.count})`)
       continue
     }
-    if (cfg.manualSelection.length > cfg.count) {
+    if (cfg.mode === 'manual' && cfg.manualSelection.length > cfg.count) {
       errors.push(`${label}: ${cfg.manualSelection.length} angehakt, aber nur ${cfg.count} konfiguriert`)
       continue
     }
@@ -253,9 +264,9 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       }
       const filters = cfg.attackeFilters ?? DEFAULT_ATTACKE_FILTERS
       const minStatusCount = Math.ceil((filters.minStatusPercent / 100) * cfg.count)
-      const maxStatusCount = Math.floor((filters.maxStatusPercent / 100) * cfg.count)
+      const maxStatusCount = Math.max(minStatusCount, Math.floor((filters.maxStatusPercent / 100) * cfg.count))
       const minPowerCount = Math.ceil((filters.minPowerPercent / 100) * cfg.count)
-      const maxPowerCount = Math.floor((filters.maxPowerPercent / 100) * cfg.count)
+      const maxPowerCount = Math.max(minPowerCount, Math.floor((filters.maxPowerPercent / 100) * cfg.count))
       if (filters.minStatusPercent > filters.maxStatusPercent) {
         errors.push(`${label}: Mindestanteil Status-Attacken groesser als der Maximalanteil`)
       }
@@ -273,14 +284,15 @@ export function validatePoolConfig(config: PoolConfig): string[] {
       if (powerAvailable < minPowerCount) {
         errors.push(`${label}: nur ${powerAvailable} Attacken mit Basiswert >= ${filters.powerThreshold} verfuegbar, aber ${minPowerCount} gefordert`)
       }
+      const manualSelection = cfg.mode === 'manual' ? cfg.manualSelection : []
       const manualStatusCount = ATTACKEN_MASTER.filter(
-        (m) => cfg.manualSelection.includes(m.name) && m.category === 'status',
+        (m) => manualSelection.includes(m.name) && m.category === 'status',
       ).length
       if (manualStatusCount > maxStatusCount) {
         errors.push(`${label}: ${manualStatusCount} manuell angehakte Status-Attacken ueberschreiten den Maximalanteil (${maxStatusCount})`)
       }
       const manualPowerCount = ATTACKEN_MASTER.filter(
-        (m) => cfg.manualSelection.includes(m.name) && isHighPower(m, filters.powerThreshold),
+        (m) => manualSelection.includes(m.name) && isHighPower(m, filters.powerThreshold),
       ).length
       if (manualPowerCount > maxPowerCount) {
         errors.push(`${label}: ${manualPowerCount} manuell angehakte starke Attacken ueberschreiten den Maximalanteil (${maxPowerCount})`)
