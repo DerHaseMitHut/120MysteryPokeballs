@@ -140,34 +140,44 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
 
   const [actionError, setActionError] = useState<string | null>(null)
   const showOverlayStage = !!room?.overlay_mode && (role === 'host' || role === 'obs')
+  // Kampfrahmen (fuer die separat in OBS eingeblendete Kampf-Aufnahme) links, dazu eine hochkante
+  // Flaeche rechts (fuer einen separat eingeblendeten Chat) -- beide bleiben leere Platzhalter, nur
+  // ihre Position/Groesse zaehlt fuers Hintergrund-Loch (siehe Effekt unten).
   const overlayBoxRef = useRef<HTMLDivElement>(null)
+  const overlayChatBoxRef = useRef<HTMLDivElement>(null)
 
-  // Aussenrum soll das Hintergrundbild sichtbar bleiben, nur die 16:9-Flaeche selbst muss fuer OBS
-  // echt transparent sein. Dafuer wird ein "Loch" exakt in Groesse/Position der Flaeche per
-  // clip-path aus dem fixierten .app-background-Layer ausgeschnitten (das Element selbst hat keine
-  // eigenen Kinder, ein Clip dort kann also nichts vom eigentlichen App-Inhalt mitclippen).
+  // Aussenrum soll das Hintergrundbild sichtbar bleiben, nur die beiden Platzhalter-Flaechen muessen
+  // fuer OBS echt transparent sein. Dafuer werden "Loecher" exakt in Groesse/Position der Flaechen
+  // per clip-path aus dem fixierten .app-background-Layer ausgeschnitten (das Element selbst hat
+  // keine eigenen Kinder, ein Clip dort kann also nichts vom eigentlichen App-Inhalt mitclippen).
   useEffect(() => {
     if (!showOverlayStage) return
     const appBg = document.querySelector<HTMLElement>('.app-background')
     const box = overlayBoxRef.current
-    if (!appBg || !box) return
+    const chatBox = overlayChatBoxRef.current
+    if (!appBg || !box || !chatBox) return
+
+    function holePath(el: HTMLElement, bgRect: DOMRect) {
+      const r = el.getBoundingClientRect()
+      const left = r.left - bgRect.left
+      const top = r.top - bgRect.top
+      const right = r.right - bgRect.left
+      const bottom = r.bottom - bgRect.top
+      return `M${left} ${top}H${right}V${bottom}H${left}Z`
+    }
 
     function update() {
       const bgRect = appBg!.getBoundingClientRect()
-      const boxRect = box!.getBoundingClientRect()
-      const holeLeft = boxRect.left - bgRect.left
-      const holeTop = boxRect.top - bgRect.top
-      const holeRight = boxRect.right - bgRect.left
-      const holeBottom = boxRect.bottom - bgRect.top
       appBg!.style.clipPath =
         `path(evenodd, "M0 0H${bgRect.width}V${bgRect.height}H0Z` +
-        `M${holeLeft} ${holeTop}H${holeRight}V${holeBottom}H${holeLeft}Z")`
+        `${holePath(box!, bgRect)}${holePath(chatBox!, bgRect)}")`
     }
 
     update()
     window.addEventListener('resize', update)
     const observer = new ResizeObserver(update)
     observer.observe(box)
+    observer.observe(chatBox)
 
     return () => {
       window.removeEventListener('resize', update)
@@ -398,7 +408,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         )}
       </div>
 
-      <CamGrid tiles={tiles} />
+      {!showOverlayStage && <CamGrid tiles={tiles} />}
 
       {room.status !== 'setup' && actionError && (
         <p className="text-center text-sm text-red-400">{actionError}</p>
@@ -420,8 +430,17 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
           />
         )
       ) : showOverlayStage ? (
-        <div className="flex-1 min-h-0 flex items-center justify-center">
-          <div ref={overlayBoxRef} className="aspect-video h-full max-w-full border-2 border-dashed border-white/40" />
+        // Kampf-Aufnahme und Chat werden separat in OBS ueber diese beiden transparenten Flaechen
+        // gelegt (siehe Hole-Cutting-Effekt oben) -- Cams + Kampfrahmen links, hochkante
+        // Chat-Flaeche rechts in voller Stagehoehe.
+        <div className="flex-1 min-h-0 flex gap-3">
+          <div className="flex flex-col gap-3 flex-1 min-w-0">
+            <CamGrid tiles={tiles} />
+            <div className="flex-1 min-h-0 flex items-center justify-center">
+              <div ref={overlayBoxRef} className="aspect-video h-full max-w-full border-2 border-dashed border-white/40" />
+            </div>
+          </div>
+          <div ref={overlayChatBoxRef} className="w-72 lg:w-80 shrink-0 border-2 border-dashed border-white/40" />
         </div>
       ) : (
         <>
