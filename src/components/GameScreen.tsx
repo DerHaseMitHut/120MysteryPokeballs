@@ -431,16 +431,21 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         )
       ) : showOverlayStage ? (
         // Kampf-Aufnahme und Chat werden separat in OBS ueber diese beiden transparenten Flaechen
-        // gelegt (siehe Hole-Cutting-Effekt oben) -- Cams + Kampfrahmen links, hochkante
-        // Chat-Flaeche rechts in voller Stagehoehe.
+        // gelegt (siehe Hole-Cutting-Effekt oben). Links: Cams gleichmaessig ueber die volle Breite
+        // gestreckt, direkt darunter der Kampfrahmen (gleiche Breite, fuellt die komplette
+        // Resthoehe bis ganz nach unten). Rechts: hochkante Chat-Flaeche (9:16), oben/unten mit
+        // Abstand statt komplett kantenbuendig gestreckt.
         <div className="flex-1 min-h-0 flex gap-3">
           <div className="flex flex-col gap-3 flex-1 min-w-0">
-            <CamGrid tiles={tiles} />
-            <div className="flex-1 min-h-0 flex items-center justify-center">
-              <div ref={overlayBoxRef} className="aspect-video h-full max-w-full border-2 border-dashed border-white/40" />
-            </div>
+            <CamGrid tiles={tiles} stretch />
+            <div ref={overlayBoxRef} className="flex-1 min-h-0 w-full border-2 border-dashed border-white/40" />
           </div>
-          <div ref={overlayChatBoxRef} className="aspect-[1/2] h-full shrink-0 border-2 border-dashed border-white/40" />
+          {/* vh statt % fuer den vertikalen Abstand: Prozent-Padding wuerde sich (CSS-Eigenheit)
+              auf die BREITE des Elternelements beziehen, nicht dessen Hoehe. Die Buehne fuellt per
+              h-screen praktisch die Viewport-Hoehe, daher ist vh hier eine gute Naeherung. */}
+          <div className="flex flex-col justify-center py-[6vh] shrink-0">
+            <div ref={overlayChatBoxRef} className="aspect-[9/16] flex-1 min-h-0 border-2 border-dashed border-white/40" />
+          </div>
         </div>
       ) : (
         <>
