@@ -440,7 +440,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               <div ref={overlayBoxRef} className="aspect-video h-full max-w-full border-2 border-dashed border-white/40" />
             </div>
           </div>
-          <div ref={overlayChatBoxRef} className="w-72 lg:w-80 shrink-0 border-2 border-dashed border-white/40" />
+          <div ref={overlayChatBoxRef} className="aspect-[1/2] h-full shrink-0 border-2 border-dashed border-white/40" />
         </div>
       ) : (
         <>
