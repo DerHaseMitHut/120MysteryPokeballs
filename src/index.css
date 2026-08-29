@@ -108,6 +108,35 @@ body {
   animation: joker-badge-flash 0.7s ease-out;
 }
 
+/* Veto-Joker-Einsatz: grosse Einblendung in der Mitte statt des Balls, die kurz stehenbleibt und
+   dann wieder ausblendet (Dauer per JS-Timer in GameScreen synchron zur Anzeigedauer gehalten,
+   siehe VETO_FLASH_MS). */
+@keyframes veto-flash-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+.veto-flash-pop {
+  animation: veto-flash-pop 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 /* Doppel-Regler (Min+Max auf einer Leiste): zwei uebereinandergelegte <input type="range">,
    deren Spur transparent/klickunempfindlich ist -- nur die beiden Griffe selbst reagieren auf
    Maus/Touch, damit man sie unabhaengig voneinander verschieben kann. Die eigentliche farbige

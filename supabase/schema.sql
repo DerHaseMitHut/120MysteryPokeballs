@@ -750,7 +750,8 @@ end;
 $$;
 
 -- Wondertrade-Joker: wuerfelt ein bereits platziertes Pokemon (eigenes oder gegnerisches) neu aus.
--- Freie Aktion (kein Zugwechsel) -- nur waehrend des eigenen Zugs nutzbar. Der neue Wert wird vom
+-- Freie Aktion (kein Zugwechsel) -- waehrend des Drafts nur am eigenen Zug, nach Draft-Ende
+-- (status 'finished') jederzeit nutzbar. Der neue Wert wird vom
 -- Client vorgeschlagen (per Filter aus rooms.pokemon_filters + Stammdaten, die nur im Frontend
 -- liegen); der Server lehnt Duplikate zu jedem Pokemon im Raum ab (auch noch versteckte Baelle,
 -- die der Client gar nicht kennen kann) -- der Client probiert bei Ablehnung einfach den naechsten
@@ -766,12 +767,17 @@ declare
   v_dupe boolean;
 begin
   select * into v_room from rooms where id = p_room_id;
-  if not found or v_room.status <> 'drafting' then
+  if not found or v_room.status not in ('drafting', 'finished') then
     raise exception 'Das Spiel laeuft gerade nicht';
   end if;
 
   v_seat := public.my_seat(p_room_id);
-  if v_seat is null or v_seat <> v_room.current_turn_seat then
+  if v_seat is null then
+    raise exception 'Du bist kein Teilnehmer dieses Raums';
+  end if;
+  -- Waehrend des Drafts nur am eigenen Zug; nach Draft-Ende (kein "Zug" mehr vorhanden) darf
+  -- jeder Sitzplatz seine restlichen Joker jederzeit einsetzen.
+  if v_room.status = 'drafting' and v_seat <> v_room.current_turn_seat then
     raise exception 'Wondertrade ist nur am eigenen Zug einsetzbar';
   end if;
 
@@ -809,7 +815,8 @@ end;
 $$;
 
 -- Wechsel-Joker: tauscht zwei gleichartige Slots im eigenen Team (mind. einer davon befuellt).
--- Freie Aktion (kein Zugwechsel) -- nur waehrend des eigenen Zugs nutzbar.
+-- Freie Aktion (kein Zugwechsel) -- waehrend des Drafts nur am eigenen Zug, nach Draft-Ende
+-- (status 'finished') jederzeit nutzbar.
 create or replace function public.use_wechsel_joker(p_room_id uuid, p_slot_a_id uuid, p_slot_b_id uuid)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -821,12 +828,17 @@ declare
   v_joker player_jokers;
 begin
   select * into v_room from rooms where id = p_room_id;
-  if not found or v_room.status <> 'drafting' then
+  if not found or v_room.status not in ('drafting', 'finished') then
     raise exception 'Das Spiel laeuft gerade nicht';
   end if;
 
   v_seat := public.my_seat(p_room_id);
-  if v_seat is null or v_seat <> v_room.current_turn_seat then
+  if v_seat is null then
+    raise exception 'Du bist kein Teilnehmer dieses Raums';
+  end if;
+  -- Waehrend des Drafts nur am eigenen Zug; nach Draft-Ende (kein "Zug" mehr vorhanden) darf
+  -- jeder Sitzplatz seine restlichen Joker jederzeit einsetzen.
+  if v_room.status = 'drafting' and v_seat <> v_room.current_turn_seat then
     raise exception 'Wechseljoker ist nur am eigenen Zug einsetzbar';
   end if;
 

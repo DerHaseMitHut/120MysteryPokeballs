@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BallCell } from './BallCell'
 import { BallRevealOverlay } from './BallRevealOverlay'
+import { VetoFlashOverlay } from './VetoFlashOverlay'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 import type { BallWithValue } from '../hooks/useBalls'
 import type { Seat } from '../lib/database.types'
@@ -30,6 +31,7 @@ interface Props {
   canVeto?: boolean
   onVeto?: () => void
   revealJoker?: JokerType | null
+  vetoFlash?: { ballNumber: number } | null
 }
 
 export function BallsGrid({
@@ -50,6 +52,7 @@ export function BallsGrid({
   canVeto,
   onVeto,
   revealJoker,
+  vetoFlash,
 }: Props) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -203,6 +206,8 @@ export function BallsGrid({
             onVeto={onVeto}
             joker={revealJoker}
           />
+        ) : vetoFlash ? (
+          <VetoFlashOverlay ballNumber={vetoFlash.ballNumber} />
         ) : (
           <div className="grid grid-cols-5 gap-2.5 h-full">
             {pageNumbers.map((n) => (

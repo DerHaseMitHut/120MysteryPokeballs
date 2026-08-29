@@ -45,6 +45,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const [wechselFirstSlotId, setWechselFirstSlotId] = useState<string | null>(null)
   const [wechselFirstSlotType, setWechselFirstSlotType] = useState<Category | null>(null)
   const [jokerError, setJokerError] = useState<string | null>(null)
+  const [vetoFlash, setVetoFlash] = useState<{ ballNumber: number } | null>(null)
 
   const mySeat: Seat | null = role === 1 || role === 2 ? role : null
 
@@ -80,6 +81,31 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     return null
   }, [balls])
 
+  // Kleine Zwischen-Animation fuers Verwerfen eines Balls per Veto-Joker (statt dass er einfach
+  // verschwindet und sofort wieder das Grid zu sehen ist): erkennt einen frischen
+  // false->true-Uebergang von "discarded" ueber die geteilten Realtime-Baelle -- damit sehen ALLE
+  // Betrachter (nicht nur die vetoende Person) dieselbe kurze "Veto!"-Einblendung, so wie auch die
+  // normale Ball-Enthuellung fuer alle synchron laeuft.
+  const prevBallsRef = useRef<typeof balls | null>(null)
+  const vetoFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const prev = prevBallsRef.current
+    if (prev) {
+      for (const [number, ball] of balls) {
+        if (ball.discarded && !prev.get(number)?.discarded) {
+          if (vetoFlashTimerRef.current) clearTimeout(vetoFlashTimerRef.current)
+          setVetoFlash({ ballNumber: number })
+          vetoFlashTimerRef.current = setTimeout(() => setVetoFlash(null), 1400)
+          break
+        }
+      }
+    }
+    prevBallsRef.current = balls
+  }, [balls])
+  useEffect(() => () => {
+    if (vetoFlashTimerRef.current) clearTimeout(vetoFlashTimerRef.current)
+  }, [])
+
   const myParticipant = mySeat ? participants.find((p) => p.seat === mySeat) : null
   const isMyTurn = mySeat != null && room?.status === 'drafting' && room.current_turn_seat === mySeat
   const canDraw = showControls && isMyTurn && !pendingBall && !myParticipant?.locked
@@ -93,6 +119,11 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
   const myJokers = mySeat != null ? jokers.filter((j) => j.seat === mySeat && !j.used) : []
   const hasVeto = myJokers.some((j) => j.joker_type === 'veto')
   const canVeto = isMyBall && isRevealed && hasVeto
+  // Wondertrade/Wechsel sind freie Aktionen ohne Zugwechsel -- waehrend des Drafts nur am eigenen
+  // Zug, nach Draft-Ende (kein "Zug" mehr vorhanden) aber weiterhin nutzbar, damit restliche Joker
+  // nicht ungenutzt verfallen. Veto braucht ohnehin immer einen offenen unplatzierten Ball, der
+  // nach Draft-Ende nie existiert -- dafuer ist keine Sonderbehandlung noetig.
+  const canUseFreeJokers = showControls && mySeat != null && (isMyTurn || room?.status === 'finished')
 
   // Der Joker eines gerade offenen, noch nicht enthuellten Balls wird bewusst NICHT sofort in der
   // Team-Leiste angezeigt (das wuerde die Spannung der Ball-Enthuellung nehmen) -- stattdessen
@@ -429,7 +460,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               onRename={mySeat === 1 ? (name) => rpc.setDisplayName(roomId, name) : undefined}
               jokerMode={jokerModeForSeat(1)}
               jokers={jokersForSeat(1)}
-              jokersClickable={mySeat === 1 && isMyTurn}
+              jokersClickable={mySeat === 1 && canUseFreeJokers}
               canVeto={canVeto}
               armedJoker={armedJoker}
               onArmJoker={handleArmJoker}
@@ -455,6 +486,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
                 canVeto={canVeto}
                 onVeto={handleUseVeto}
                 revealJoker={pendingJoker?.joker_type ?? null}
+                vetoFlash={vetoFlash}
               />
             </div>
 
@@ -471,7 +503,7 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               align="right"
               jokerMode={jokerModeForSeat(2)}
               jokers={jokersForSeat(2)}
-              jokersClickable={mySeat === 2 && isMyTurn}
+              jokersClickable={mySeat === 2 && canUseFreeJokers}
               canVeto={canVeto}
               armedJoker={armedJoker}
               onArmJoker={handleArmJoker}
