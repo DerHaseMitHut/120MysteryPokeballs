@@ -432,13 +432,18 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
       ) : showOverlayStage ? (
         // Kampf-Aufnahme und Chat werden separat in OBS ueber diese beiden transparenten Flaechen
         // gelegt (siehe Hole-Cutting-Effekt oben). Links: Cams gleichmaessig ueber die volle Breite
-        // gestreckt, direkt darunter der Kampfrahmen (gleiche Breite, fuellt die komplette
-        // Resthoehe bis ganz nach unten). Rechts: hochkante Chat-Flaeche (9:16), oben/unten mit
-        // Abstand statt komplett kantenbuendig gestreckt.
+        // gestreckt, direkt darunter der Kampfrahmen (gleiche Breite, echtes 16:9 -- die Kampf-
+        // Aufnahme ist selbst 16:9, ein anderes Verhaeltnis liesse einen Rand frei). Rechts:
+        // hochkante Chat-Flaeche (9:16), oben/unten mit Abstand statt komplett kantenbuendig
+        // gestreckt.
         <div className="flex-1 min-h-0 flex gap-3">
           <div className="flex flex-col gap-3 flex-1 min-w-0">
             <CamGrid tiles={tiles} stretch />
-            <div ref={overlayBoxRef} className="flex-1 min-h-0 w-full border-2 border-dashed border-white/40" />
+            {/* Breite von der Spalte (= Cam-Reihe) uebernehmen, Hoehe per aspect-video daraus
+                ableiten -- muss zwingend echtes 16:9 bleiben, sonst passt die separat in OBS
+                gelegte Kampf-Aufnahme (die selbst 16:9 ist) nicht exakt in die Flaeche und laesst
+                am Rand einen Balken frei. */}
+            <div ref={overlayBoxRef} className="w-full aspect-video border-2 border-dashed border-white/40" />
           </div>
           {/* Breite zuerst festlegen (definiter Wert aus der Zeilenbreite), Hoehe per aspect-ratio
               daraus ableiten -- NICHT umgekehrt (Hoehe per flex-grow in einer breiten-auto Spalte,
