@@ -440,11 +440,13 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
             <CamGrid tiles={tiles} stretch />
             <div ref={overlayBoxRef} className="flex-1 min-h-0 w-full border-2 border-dashed border-white/40" />
           </div>
-          {/* vh statt % fuer den vertikalen Abstand: Prozent-Padding wuerde sich (CSS-Eigenheit)
-              auf die BREITE des Elternelements beziehen, nicht dessen Hoehe. Die Buehne fuellt per
-              h-screen praktisch die Viewport-Hoehe, daher ist vh hier eine gute Naeherung. */}
-          <div className="flex flex-col justify-center py-[6vh] shrink-0">
-            <div ref={overlayChatBoxRef} className="aspect-[9/16] flex-1 min-h-0 border-2 border-dashed border-white/40" />
+          {/* Breite zuerst festlegen (definiter Wert aus der Zeilenbreite), Hoehe per aspect-ratio
+              daraus ableiten -- NICHT umgekehrt (Hoehe per flex-grow in einer breiten-auto Spalte,
+              Breite per aspect-ratio daraus): das fuehrt zu einem Zirkelbezug, den Browser mit
+              Breite ~0 aufloesen (kollabierter Strich statt Box). justify-center zentriert die so
+              bereits fertig bemessene Box senkrecht in der vollen Spaltenhoehe. */}
+          <div className="w-[23%] shrink-0 h-full flex flex-col justify-center">
+            <div ref={overlayChatBoxRef} className="w-full aspect-[9/16] border-2 border-dashed border-white/40" />
           </div>
         </div>
       ) : (
