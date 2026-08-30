@@ -7,10 +7,22 @@ type RtcSignal =
   | { kind: 'answer'; from: string; to: string; sdp: string }
   | { kind: 'ice-candidate'; from: string; to: string; candidate: RTCIceCandidateInit }
 
+// Mehrere STUN-Server (Redundanz -- fällt einer aus/ist langsam, bleiben genug fuer die
+// Reflexive-Candidate-Ermittlung) plus den TURN-Relay explizit sowohl per UDP als auch per
+// erzwungenem TCP (turn:...443?transport=tcp) eingetragen: reines UDP-TURN wird von manchen
+// restriktiven Firmen-/Mobilfunk-Netzen komplett geblockt, waehrend TCP-ueber-443 meist
+// durchkommt, weil es wie normaler HTTPS-Traffic aussieht -- genau die Faelle, in denen zwei
+// Teilnehmer in unterschiedlichen Netzen sonst nie eine Route zueinander finden.
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
   {
-    urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp',
+    ],
     username: 'openrelayproject',
     credential: 'openrelayproject',
   },
