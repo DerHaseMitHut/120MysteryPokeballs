@@ -60,6 +60,18 @@ export function useTeamSlots(roomId: string | null) {
           if (row.filled_ball_id) refetchValue(row.id, row.filled_ball_id)
         },
       )
+      // Ein bereits platzierter Ball kann seinen Wert nachtraeglich aendern (Wondertrade-Joker
+      // wuerfelt ein Pokemon neu, Protect-Joker ersetzt eine Attacke durch Schutzschild) -- beides
+      // aendert NUR ball_contents.value, nie die team_slots-Zeile selbst. Ohne dieses eigene
+      // Abo blieb der alte Wert bis zum naechsten Reload stehen, weil der Handler oben nie feuerte.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ball_contents', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          const row = payload.new as { ball_id: string; value: string }
+          setSlots((prev) => prev.map((s) => (s.filled_ball_id === row.ball_id ? { ...s, value: row.value } : s)))
+        },
+      )
       .subscribe()
 
     return () => {

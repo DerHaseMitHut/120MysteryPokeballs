@@ -68,6 +68,26 @@ export function useBalls(roomId: string | null) {
           if (row.opened) refetchValue(row.id, row.number)
         },
       )
+      // Ein bereits geoeffneter Ball kann seinen Wert nachtraeglich aendern (Wondertrade-/
+      // Protect-Joker) -- das aendert NUR ball_contents.value, nie die balls-Zeile selbst, feuert
+      // also nie den Handler oben. Eigenes Abo dafuer, damit der Wert live nachgezogen wird.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ball_contents', filter: `room_id=eq.${roomId}` },
+        (payload) => {
+          const row = payload.new as { ball_id: string; value: string }
+          setBalls((prev) => {
+            for (const [number, b] of prev) {
+              if (b.id === row.ball_id) {
+                const next = new Map(prev)
+                next.set(number, { ...b, value: row.value })
+                return next
+              }
+            }
+            return prev
+          })
+        },
+      )
       .subscribe()
 
     return () => {
