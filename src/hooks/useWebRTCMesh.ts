@@ -2,10 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase, freshChannel } from '../lib/supabaseClient'
 
+// fromSession identifiziert die konkrete Tab-/Verbindungsinstanz des Senders (neu ausgewuerfelt bei
+// jedem Hook-Mount, siehe mySessionIdRef) -- getrennt von der stabilen peerId (Nutzer-Identitaet).
+// Damit laesst sich ein Reload zuverlaessig erkennen: derselbe peerId taucht mit einer NEUEN
+// Session auf, was signalisiert "die alte Verbindung zu dieser Person ist tot, sofort verwerfen"
+// (siehe ensureFreshSession), statt erst auf einen ggf. verzoegerten/verpassten Presence-"leave"
+// oder einen ICE-Timeout zu warten. Genau das verursachte die schwarzen Bildschirme: die alte
+// Verbindung galt noch als "verbunden", lieferte aber keine Frames mehr.
 type RtcSignal =
-  | { kind: 'offer'; from: string; to: string; sdp: string }
-  | { kind: 'answer'; from: string; to: string; sdp: string }
-  | { kind: 'ice-candidate'; from: string; to: string; candidate: RTCIceCandidateInit }
+  | { kind: 'offer'; from: string; fromSession: string; to: string; sdp: string }
+  | { kind: 'answer'; from: string; fromSession: string; to: string; sdp: string }
+  | { kind: 'ice-candidate'; from: string; fromSession: string; to: string; candidate: RTCIceCandidateInit }
+
+// Plain Omit<Union, K> kollabiert bei einem discriminated Union auf die gemeinsamen Keys aller
+// Varianten (TS berechnet keyof ueber die Schnittmenge) -- dadurch wuerden sdp/candidate aus den
+// einzelnen Signal-Varianten verschwinden. Die distributive Variante wendet Omit auf jede
+// Vereinigungs-Variante einzeln an und erhaelt so deren jeweils eigene Felder.
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never
 
 // Mehrere STUN-Server (Redundanz -- fällt einer aus/ist langsam, bleiben genug fuer die
 // Reflexive-Candidate-Ermittlung) plus den TURN-Relay explizit sowohl per UDP als auch per
@@ -71,6 +84,12 @@ export function useWebRTCMesh(
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
   const restartTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  // Eigene, pro Hook-Mount neu erzeugte Session-Kennung (siehe Kommentar bei RtcSignal) sowie die
+  // zuletzt gesehene Session-Kennung je Gegenstelle, um einen Reload derselben Person zu erkennen.
+  const mySessionIdRef = useRef<string>(
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  )
+  const peerSessionIdsRef = useRef<Map<string, string>>(new Map())
   // Wird von der Signalisierungs-Effekt-Instanz befuellt, damit der (separate) Kamera-Sync-Effekt
   // unten bei einem Kamera-An/Aus bestehende Verbindungen aktiv nachverhandeln kann, ohne dass
   // beide Effekte an dieselben Deps gebunden sein muessen (siehe Kommentar dort).
@@ -129,8 +148,24 @@ export function useWebRTCMesh(
       }
     }
 
-    function send(signal: RtcSignal) {
-      channel.send({ type: 'broadcast', event: 'rtc-signal', payload: signal })
+    function send(signal: DistributiveOmit<RtcSignal, 'fromSession'>) {
+      const payload: RtcSignal = { ...signal, fromSession: mySessionIdRef.current } as RtcSignal
+      channel.send({ type: 'broadcast', event: 'rtc-signal', payload })
+    }
+
+    // Wird aufgerufen, sobald wir (per Presence-Sync ODER per eingehendem Signal) die
+    // Session-Kennung einer Gegenstelle sehen: hat sich diese gegenueber dem zuletzt bekannten Wert
+    // geaendert (oder ist die Gegenstelle neu), heisst das entweder "erste Begegnung" oder "die
+    // Person hat neu geladen" -- im zweiten Fall wird eine ggf. noch vorhandene, jetzt tote alte
+    // Verbindung sofort verworfen, statt auf einen verzoegerten/verpassten "leave" oder einen
+    // ICE-Timeout zu warten (das verursachte die schwarzen Bildschirme nach einem Reload).
+    function ensureFreshSession(otherId: string, sessionId: string) {
+      const last = peerSessionIdsRef.current.get(otherId)
+      if (last === sessionId) return
+      peerSessionIdsRef.current.set(otherId, sessionId)
+      if (last !== undefined && peersRef.current.has(otherId)) {
+        teardownPeer(otherId)
+      }
     }
 
     // Einzige Stelle, die tatsaechlich ein Offer verschickt -- fuer die Erstverbindung, nach
@@ -283,6 +318,10 @@ export function useWebRTCMesh(
 
     async function handleSignal(signal: RtcSignal) {
       if (signal.to !== myPeerId) return
+      // Signale koennen die Presence-Sync-basierte Erkennung ueberholen (Broadcast trifft vor dem
+      // naechsten 'sync'-Event ein) -- deshalb auch hier pruefen, damit ein Offer nach einem Reload
+      // der Gegenstelle nie gegen eine tote Alt-Verbindung verhandelt wird.
+      ensureFreshSession(signal.from, signal.fromSession)
 
       // Nur ein eingehendes Offer darf eine noch fehlende Verbindung ueberhaupt erst anlegen (samt
       // unserem lokalen Track/Transceiver, den die Antwort gleich mit einschliessen muss). Ein
@@ -348,12 +387,14 @@ export function useWebRTCMesh(
     // Seiten gleichzeitig ein Offer schicken, bietet bei jedem entdeckten Paar nur die Seite mit
     // der (lexikografisch) kleineren Peer-Id an.
     function handlePresenceSync() {
-      const state = channel.presenceState<{ peerId: string }>()
+      const state = channel.presenceState<{ peerId: string; sessionId: string }>()
       for (const key in state) {
         const metas = state[key]
         const entry = metas?.[metas.length - 1]
         const otherId = entry?.peerId
-        if (!otherId || otherId === myPeerId || peersRef.current.has(otherId)) continue
+        if (!otherId || otherId === myPeerId) continue
+        if (entry.sessionId) ensureFreshSession(otherId, entry.sessionId)
+        if (peersRef.current.has(otherId)) continue
         if (myPeerId! < otherId) {
           offerTo(otherId)
         }
@@ -372,7 +413,7 @@ export function useWebRTCMesh(
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ peerId: myPeerId })
+          await channel.track({ peerId: myPeerId, sessionId: mySessionIdRef.current })
         }
       })
 
