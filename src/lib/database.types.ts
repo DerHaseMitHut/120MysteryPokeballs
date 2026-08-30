@@ -170,6 +170,7 @@ export interface Database {
         Args: { p_room_id: string; p_slot_a_id: string; p_slot_b_id: string }
         Returns: void
       }
+      use_protect_joker: { Args: { p_room_id: string; p_target_ball_id: string }; Returns: void }
       lock_team: { Args: { p_room_id: string }; Returns: void }
       claim_obs_view: { Args: { p_room_id: string; p_obs_token: string }; Returns: void }
       regenerate_obs_token: { Args: { p_room_id: string }; Returns: string }

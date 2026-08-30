@@ -47,25 +47,28 @@ Teilnehmer 1, Teilnehmer 2) — gleiches Profil in mehreren Tabs teilt dieselbe 
 
 ## Joker
 
-Zusätzlich zu ihrem Standardinhalt können Bälle einen von drei Jokern enthalten (z.B. Pokémon +
+Zusätzlich zu ihrem Standardinhalt können Bälle einen von vier Jokern enthalten (z.B. Pokémon +
 Joker). Chance pro Ball, optionale Gesamt-/Pro-Art-Obergrenzen und Gewichtung stellt der Host vor
 Spielstart im Setup-Bildschirm ein ("Joker"-Bereich). Wer einen Ball mit Joker öffnet, bekommt ihn
-sofort und kann ihn während seines eigenen Zugs einmalig einsetzen — die Joker-Leiste zwischen
-Kamera- und Team-Ansicht zeigt für beide Teilnehmer öffentlich, wer welchen Joker zur Verfügung
-hat.
+sofort (sichtbar wird er aber erst nach der Ball-Enthüllung, um die Spannung nicht vorwegzunehmen)
+und kann ihn während seines eigenen Zugs einmalig einsetzen — direkt im Team-Header neben dem
+eigenen Namen zeigt sich für beide Teilnehmer öffentlich, wer welchen Joker zur Verfügung hat.
+Wondertrade, Wechsel und Protect sind freie Aktionen ohne Zugverbrauch und bleiben auch nach
+Draft-Ende nutzbar, solange noch welche übrig sind.
 
-- **Veto**: Verwirft den gerade gezogenen Ball, ohne ihn platzieren zu müssen (löst sich direkt in
-  der Ball-Enthüllung oder über die Joker-Leiste).
+- **Veto**: Verwirft den gerade gezogenen Ball, ohne ihn platzieren zu müssen (Button direkt in der
+  Ball-Enthüllung oder über das Joker-Badge im eigenen Team-Header).
 - **Wondertrade**: Würfelt ein bereits platziertes Pokémon (eigenes oder gegnerisches) neu aus,
-  gemäß der beim Pool-Setup gewählten Pokémon-Filter. In der Joker-Leiste anklicken, danach ein
-  Pokémon in einem der beiden Teams auswählen.
+  gemäß der beim Pool-Setup gewählten Pokémon-Filter. Joker-Badge anklicken, danach ein Pokémon in
+  einem der beiden Teams auswählen.
 - **Wechsel**: Tauscht zwei gleichartige Slots im eigenen Team (z.B. zwei Pokémon oder zwei
-  Attacken). In der Joker-Leiste anklicken, danach nacheinander zwei eigene Slots derselben Art
-  auswählen.
+  Attacken). Joker-Badge anklicken, danach nacheinander zwei eigene Slots derselben Art auswählen.
+- **Protect**: Ersetzt eine eigene, bereits platzierte Attacke durch Schutzschild. Joker-Badge
+  anklicken, danach eine eigene Attacke auswählen.
 
-Eigene Icons für die drei Joker lassen sich unter [`public/joker-icons/`](public/joker-icons/)
-ablegen (`veto.png`, `wondertrade.png`, `wechsel.png`) — ohne eigene Bilder zeigt die App
-automatisch Emoji-Platzhalter.
+Eigene Icons für die vier Joker lassen sich unter [`public/joker-icons/`](public/joker-icons/)
+ablegen (`veto.png`, `wondertrade.png`, `wechsel.png`, `protect.png`) — ohne eigene Bilder zeigt
+die App automatisch Emoji-Platzhalter.
 
 ## Wichtige Sicherheitseigenschaft
 

@@ -6,7 +6,8 @@ import type { Category } from '../lib/database.types'
 // Zielauswahl fuer einen aktiv "scharf geschalteten" Joker (siehe GameScreen). Wondertrade zielt
 // auf ein bereits platziertes Pokemon (eigenes ODER gegnerisches); Wechsel zielt auf zwei
 // gleichartige Slots im EIGENEN Team (ownTeam steuert, ob dieses FieldCard-Team ueberhaupt in
-// Frage kommt) und merkt sich den ersten gewaehlten Slot, bis der zweite gewaehlt wird.
+// Frage kommt) und merkt sich den ersten gewaehlten Slot, bis der zweite gewaehlt wird; Protect
+// zielt auf eine einzelne eigene Attacke.
 export type JokerFieldMode =
   | { kind: 'wondertrade'; onPickPokemon: (ballId: string) => void }
   | {
@@ -16,6 +17,7 @@ export type JokerFieldMode =
       firstSlotType: Category | null
       onPickSlot: (slotId: string, slotType: Category) => void
     }
+  | { kind: 'protect'; ownTeam: boolean; onPickAttacke: (ballId: string) => void }
 
 interface Props {
   fieldIndex: number
@@ -49,6 +51,11 @@ export function FieldCard({ fieldIndex, slots, selectableCategory, onSelectSlot,
         selected = jokerMode.firstSlotId === slotId
         onSelect = () => jokerMode.onPickSlot(slotId, slotType)
       }
+    } else if (jokerMode?.kind === 'protect' && jokerMode.ownTeam && slotType === 'attacke' && slot?.filled_ball_id) {
+      const ballId = slot.filled_ball_id
+      selectable = true
+      accent = 'pink'
+      onSelect = () => jokerMode.onPickAttacke(ballId)
     }
 
     return {

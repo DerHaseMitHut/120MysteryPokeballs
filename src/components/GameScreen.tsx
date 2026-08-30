@@ -288,6 +288,16 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
     }
   }
 
+  async function handleProtectPick(ballId: string) {
+    setJokerError(null)
+    try {
+      await rpc.useProtectJoker(roomId, ballId)
+      setArmedJoker(null)
+    } catch (err) {
+      setJokerError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   function jokerModeForSeat(seat: Seat): JokerFieldMode | null {
     if (armedJoker === 'wondertrade') {
       return { kind: 'wondertrade', onPickPokemon: handleWondertradePick }
@@ -300,6 +310,9 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
         firstSlotType: wechselFirstSlotType,
         onPickSlot: handleWechselPick,
       }
+    }
+    if (armedJoker === 'protect') {
+      return { kind: 'protect', ownTeam: seat === mySeat, onPickAttacke: handleProtectPick }
     }
     return null
   }
@@ -464,9 +477,11 @@ export function GameScreen({ roomId, myUserId, role, showControls }: Props) {
               <span>
                 {armedJoker === 'wondertrade'
                   ? `${JOKER_LABELS.wondertrade} aktiv: Wähle ein Pokémon (eigenes oder gegnerisches)`
-                  : wechselFirstSlotId
-                    ? `${JOKER_LABELS.wechsel} aktiv: Wähle das zweite Feld`
-                    : `${JOKER_LABELS.wechsel} aktiv: Wähle zwei gleichartige Felder in deinem Team`}
+                  : armedJoker === 'protect'
+                    ? `${JOKER_LABELS.protect} aktiv: Wähle eine eigene Attacke`
+                    : wechselFirstSlotId
+                      ? `${JOKER_LABELS.wechsel} aktiv: Wähle das zweite Feld`
+                      : `${JOKER_LABELS.wechsel} aktiv: Wähle zwei gleichartige Felder in deinem Team`}
               </span>
               <button
                 type="button"

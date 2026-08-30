@@ -25,7 +25,8 @@ create table public.rooms (
     "types": {
       "veto": { "enabled": true, "weight": 1, "maxCount": null },
       "wondertrade": { "enabled": true, "weight": 1, "maxCount": null },
-      "wechsel": { "enabled": true, "weight": 1, "maxCount": null }
+      "wechsel": { "enabled": true, "weight": 1, "maxCount": null },
+      "protect": { "enabled": true, "weight": 1, "maxCount": null }
     }
   }'::jsonb,
   -- Beim Pool-Setup gewaehlte Pokemon-Filter, fuer Wondertrade-Rerolls waehrend des Drafts (siehe
@@ -85,7 +86,7 @@ create table public.ball_contents (
   value text not null,
   -- Optionaler Zusatz-Joker, der zusaetzlich zum Standardinhalt in diesem Ball steckt. Wie der
   -- Wert selbst erst nach dem Oeffnen sichtbar (gleiche "reveal rule"-Policy unten).
-  joker_type text check (joker_type in ('veto', 'wondertrade', 'wechsel'))
+  joker_type text check (joker_type in ('veto', 'wondertrade', 'wechsel', 'protect'))
 );
 
 -- Joker-Inventar je Teilnehmer: einzelne Zeilen (nicht nur ein Zaehler), damit sich einzelne
@@ -96,7 +97,7 @@ create table public.player_jokers (
   id uuid primary key default gen_random_uuid(),
   room_id uuid not null references public.rooms(id) on delete cascade,
   seat int not null check (seat in (1, 2)),
-  joker_type text not null check (joker_type in ('veto', 'wondertrade', 'wechsel')),
+  joker_type text not null check (joker_type in ('veto', 'wondertrade', 'wechsel', 'protect')),
   source_ball_id uuid references public.balls(id) on delete set null,
   granted_at timestamptz not null default now(),
   used boolean not null default false,
@@ -467,7 +468,7 @@ declare
   v_max_total int;
   v_ball_ids uuid[];
   v_bid uuid;
-  v_type_keys text[] := array['veto', 'wondertrade', 'wechsel'];
+  v_type_keys text[] := array['veto', 'wondertrade', 'wechsel', 'protect'];
   v_granted_total int := 0;
   v_granted_by_type jsonb := '{}'::jsonb;
   v_type text;
@@ -883,6 +884,53 @@ begin
 end;
 $$;
 
+-- Protect-Joker: ersetzt eine einzelne eigene, bereits platzierte Attacke durch "Schutzschild"
+-- (fester Wert -- kein Reroll, deshalb auch keine Duplikat-Pruefung noetig wie bei Wondertrade,
+-- mehrere Pokemon mit Schutzschild sind normal/erlaubt). Freie Aktion (kein Zugwechsel) --
+-- waehrend des Drafts nur am eigenen Zug, nach Draft-Ende jederzeit nutzbar.
+create or replace function public.use_protect_joker(p_room_id uuid, p_target_ball_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_room rooms;
+  v_seat int;
+  v_slot team_slots;
+  v_joker player_jokers;
+begin
+  select * into v_room from rooms where id = p_room_id;
+  if not found or v_room.status not in ('drafting', 'finished') then
+    raise exception 'Das Spiel laeuft gerade nicht';
+  end if;
+
+  v_seat := public.my_seat(p_room_id);
+  if v_seat is null then
+    raise exception 'Du bist kein Teilnehmer dieses Raums';
+  end if;
+  if v_room.status = 'drafting' and v_seat <> v_room.current_turn_seat then
+    raise exception 'Protect ist nur am eigenen Zug einsetzbar';
+  end if;
+
+  select * into v_slot from team_slots
+    where room_id = p_room_id and filled_ball_id = p_target_ball_id and slot_type = 'attacke'
+    for update;
+  if not found or v_slot.seat <> v_seat then
+    raise exception 'Ungueltige Ziel-Attacke';
+  end if;
+
+  select * into v_joker from player_jokers
+    where room_id = p_room_id and seat = v_seat and joker_type = 'protect' and used = false
+    order by granted_at asc limit 1 for update;
+  if not found then
+    raise exception 'Kein Protect-Joker verfuegbar';
+  end if;
+
+  update ball_contents set value = 'Schutzschild' where ball_id = p_target_ball_id;
+  update player_jokers set used = true, used_at = now(),
+      used_detail = jsonb_build_object('target_ball_id', p_target_ball_id)
+    where id = v_joker.id;
+end;
+$$;
+
 create or replace function public.lock_team(p_room_id uuid)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -1081,6 +1129,7 @@ revoke all on function public.place_ball(uuid, uuid, int, text, int) from public
 revoke all on function public.use_veto_joker(uuid) from public;
 revoke all on function public.use_wondertrade_joker(uuid, uuid, text) from public;
 revoke all on function public.use_wechsel_joker(uuid, uuid, uuid) from public;
+revoke all on function public.use_protect_joker(uuid, uuid) from public;
 revoke all on function public.reset_draft(uuid) from public;
 revoke all on function public.undo_last_action(uuid) from public;
 
@@ -1095,6 +1144,7 @@ grant execute on function public.place_ball(uuid, uuid, int, text, int) to authe
 grant execute on function public.use_veto_joker(uuid) to authenticated;
 grant execute on function public.use_wondertrade_joker(uuid, uuid, text) to authenticated;
 grant execute on function public.use_wechsel_joker(uuid, uuid, uuid) to authenticated;
+grant execute on function public.use_protect_joker(uuid, uuid) to authenticated;
 grant execute on function public.lock_team(uuid) to authenticated;
 grant execute on function public.claim_obs_view(uuid, text) to authenticated;
 grant execute on function public.regenerate_obs_token(uuid) to authenticated;

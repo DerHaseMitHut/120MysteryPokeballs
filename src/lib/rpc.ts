@@ -59,6 +59,9 @@ export const rpc = {
   useWechselJoker: (roomId: string, slotAId: string, slotBId: string) =>
     call<void>('use_wechsel_joker', { p_room_id: roomId, p_slot_a_id: slotAId, p_slot_b_id: slotBId }),
 
+  useProtectJoker: (roomId: string, targetBallId: string) =>
+    call<void>('use_protect_joker', { p_room_id: roomId, p_target_ball_id: targetBallId }),
+
   lockTeam: (roomId: string) => call<void>('lock_team', { p_room_id: roomId }),
 
   claimObsView: (roomId: string, obsToken: string) =>

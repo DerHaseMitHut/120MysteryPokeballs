@@ -1,17 +1,19 @@
-export type JokerType = 'veto' | 'wondertrade' | 'wechsel'
+export type JokerType = 'veto' | 'wondertrade' | 'wechsel' | 'protect'
 
-export const JOKER_TYPES: JokerType[] = ['veto', 'wondertrade', 'wechsel']
+export const JOKER_TYPES: JokerType[] = ['veto', 'wondertrade', 'wechsel', 'protect']
 
 export const JOKER_LABELS: Record<JokerType, string> = {
   veto: 'Veto',
   wondertrade: 'Wondertrade',
   wechsel: 'Wechsel',
+  protect: 'Protect',
 }
 
 export const JOKER_DESCRIPTIONS: Record<JokerType, string> = {
   veto: 'Verwirft einen gezogenen Ball, ohne ihn platzieren zu müssen.',
   wondertrade: 'Würfelt ein platziertes Pokémon (eigenes oder gegnerisches) neu aus.',
   wechsel: 'Tauscht zwei gleichartige Slots innerhalb des eigenen Teams.',
+  protect: 'Ersetzt eine eigene Attacke durch Schutzschild.',
 }
 
 // Bild pro Jokerart -- Host legt die Dateien selbst in public/joker-icons/ ab (siehe README dort).
@@ -20,12 +22,14 @@ export const JOKER_ICON_SRC: Record<JokerType, string> = {
   veto: '/joker-icons/veto.png',
   wondertrade: '/joker-icons/wondertrade.png',
   wechsel: '/joker-icons/wechsel.png',
+  protect: '/joker-icons/protect.png',
 }
 
 export const JOKER_FALLBACK_EMOJI: Record<JokerType, string> = {
   veto: '🚫',
   wondertrade: '🔀',
   wechsel: '🔁',
+  protect: '🛡️',
 }
 
 export interface JokerTypeConfig {
@@ -57,6 +61,7 @@ export function defaultJokerConfig(): JokerConfig {
       veto: defaultJokerTypeConfig(),
       wondertrade: defaultJokerTypeConfig(),
       wechsel: defaultJokerTypeConfig(),
+      protect: defaultJokerTypeConfig(),
     },
   }
 }
